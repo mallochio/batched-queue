@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "types": ["bun"],
+    "allowImportingTsExtensions": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": [
+    "actions.ts",
+    "analyzer.ts",
+    "capture.ts",
+    "config.ts",
+    "constants.ts",
+    "executors/**/*.ts",
+    "diff-validation/**/*.ts",
+    "extension.ts",
+    "guards.ts",
+    "lib/**/*.ts",
+    "smoke-test.ts",
+    "headless-test.ts",
+    "index.ts",
+    "payload.ts",
+    "persistent-shell.ts",
+    "queue-runner.ts",
+    "results.ts",
+    "schemas.ts",
+    "state.ts",
+    "truncation.ts",
+    "**/*.test.ts"
+  ],
+  "exclude": ["node_modules"]
+}

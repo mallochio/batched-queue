@@ -1,0 +1,38 @@
+{
+  "name": "batched-queue",
+  "version": "0.1.0",
+  "description": "Stateful batched action queue Pi extension (read, grep, bash, apply_diff)",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mallochio/batched-queue"
+  },
+  "pi": {
+    "extensions": [
+      "./extension.ts"
+    ]
+  },
+  "scripts": {
+    "setup": "bun install && pi install \"$(pwd)\"",
+    "setup:local": "bun install && pi install -l \"$(pwd)\"",
+    "test": "bun test && bun run smoke-test.ts && bun run headless-test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.0"
+  },
+  "devDependencies": {
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*",
+    "@types/bun": "^1.3.14",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0"
+  }
+}
