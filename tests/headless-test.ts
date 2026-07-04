@@ -17,7 +17,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const extensionDir = path.dirname(fileURLToPath(import.meta.url));
-const extensionPath = path.join(extensionDir, "extension.ts");
+const extensionPath = path.join(extensionDir, "..", "src", "extension.ts");
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "bq-headless-"));
 fs.writeFileSync(path.join(tmpDir, "hello.txt"), "hello world\n");
 
@@ -66,6 +66,7 @@ const mockContext = {
 		custom: async () => undefined,
 	},
 	hasUI: false,
+	signal: undefined,
 	isIdle: () => true,
 	abort: () => {},
 	hasPendingMessages: () => false,
@@ -73,7 +74,7 @@ const mockContext = {
 	getContextUsage: () => undefined,
 	compact: () => {},
 	getSystemPrompt: () => "",
-} as ExtensionContext;
+} as unknown as ExtensionContext;
 
 const result = await registeredTool.definition.execute(
 	"test-call-1",
@@ -88,12 +89,14 @@ const result = await registeredTool.definition.execute(
 	mockContext,
 );
 
-if (result.isError) {
-	console.error("batch_queue returned error:", result.content[0]);
+const toolResult = result as typeof result & { isError?: boolean };
+
+if (toolResult.isError) {
+	console.error("batch_queue returned error:", toolResult.content[0]);
 	process.exit(1);
 }
 
-const text = result.content[0]?.type === "text" ? result.content[0].text : "";
+const text = toolResult.content[0]?.type === "text" ? toolResult.content[0].text : "";
 if (!text.includes("batch completed successfully")) {
 	console.error("Unexpected batch result:\n", text);
 	process.exit(1);

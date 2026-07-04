@@ -8,10 +8,10 @@ import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { PersistentShell } from "./persistent-shell";
-import { executeBashCommand } from "./executors/execute-bash";
+import { PersistentShell } from "../src/persistent-shell";
+import { executeBashCommand } from "../src/executors/execute-bash";
 
-mock.module("./lib/permissions", () => ({
+mock.module("../src/lib/permissions", () => ({
 	evaluatePermissionAsync: async () => ({
 		action: "reject",
 		message: "blocked by test rule",

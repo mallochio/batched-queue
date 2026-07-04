@@ -8,9 +8,9 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { BatchQueueRunner } from "./queue-runner";
-import { PersistentShell } from "./persistent-shell";
-import { BASH_TIMEOUT_EXIT_CODE } from "./constants";
+import { BatchQueueRunner } from "../src/queue-runner";
+import { PersistentShell } from "../src/persistent-shell";
+import { BASH_TIMEOUT_EXIT_CODE } from "../src/constants";
 
 describe("PersistentShell", () => {
 	let shell: PersistentShell;

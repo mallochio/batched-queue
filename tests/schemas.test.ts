@@ -6,22 +6,22 @@
 
 import { describe, it, expect } from "bun:test";
 import { Value } from "@sinclair/typebox/value";
-import { DEFAULT_MAX_BATCH_ACTIONS } from "./constants.js";
+import { DEFAULT_MAX_BATCH_ACTIONS } from "../src/constants.js";
 import {
 	parseActionBatchPayload,
 	isQueueAction,
 	matchQueueAction,
 	validateReadLinesRange,
 	validateBatchActionCount,
-} from "./guards.js";
+} from "../src/guards.js";
 import {
 	createInitialBatchQueueSessionState,
 	snapshotShellState,
-} from "./state.js";
+} from "../src/state.js";
 import {
 	createActionBatchPayloadSchema,
 	createBatchExecutionResultSchema,
-} from "./schemas.js";
+} from "../src/schemas.js";
 
 describe("ActionBatchPayload validation", () => {
 	it("accepts a valid multi-action batch", () => {

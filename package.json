@@ -15,13 +15,13 @@
   },
   "pi": {
     "extensions": [
-      "./extension.ts"
+      "./src/extension.ts"
     ]
   },
   "scripts": {
     "setup": "bun install && pi install \"$(pwd)\"",
     "setup:local": "bun install && pi install -l \"$(pwd)\"",
-    "test": "bun test && bun run smoke-test.ts && bun run headless-test.ts",
+    "test": "bun test && bun run tests/smoke-test.ts && bun run tests/headless-test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

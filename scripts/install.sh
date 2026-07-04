@@ -2,13 +2,13 @@
 # Install batched-queue as a Pi extension (user-global or project-local).
 #
 # Usage:
-#   ./install.sh           # register in ~/.pi/agent/settings.json (recommended)
-#   ./install.sh --local   # register in .pi/settings.json for this repo only
-#   ./install.sh --verify  # install deps and run smoke test only (no pi register)
+#   ./scripts/install.sh           # register in ~/.pi/agent/settings.json (recommended)
+#   ./scripts/install.sh --local   # register in .pi/settings.json for this repo only
+#   ./scripts/install.sh --verify  # install deps and run smoke test only (no pi register)
 
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOCAL=false
 VERIFY_ONLY=false
 
@@ -77,9 +77,9 @@ fi
 
 echo "Running smoke test..."
 if command -v bun >/dev/null 2>&1; then
-	bun run smoke-test.ts
+	bun run tests/smoke-test.ts
 else
-	npx tsx smoke-test.ts
+	npx tsx tests/smoke-test.ts
 fi
 
 if $VERIFY_ONLY; then
@@ -97,7 +97,7 @@ fi
 
 echo ""
 echo "Installed. Start Pi normally, or load once without registering:"
-echo "  pi -e \"$ROOT/extension.ts\""
+echo "  pi -e \"$ROOT/src/extension.ts\""
 echo ""
 echo "Optional: set a cheap executor model for batch planning, e.g.:"
 echo "  export BATCH_QUEUE_EXECUTOR=openai/gpt-5.4-nano"

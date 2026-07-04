@@ -8,8 +8,8 @@ import { discoverAndLoadExtensions } from "@mariozechner/pi-coding-agent";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const extensionPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "extension.ts");
-const cwd = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const extensionPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "src", "extension.ts");
+const cwd = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const result = await discoverAndLoadExtensions([extensionPath], cwd);
 

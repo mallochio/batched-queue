@@ -2,6 +2,23 @@
 
 Stateful batched action queue for [Pi](https://github.com/earendil-works/pi-mono) coding agent sessions. It executes up to N sequential actions (`read_lines`, `grep_pattern`, `execute_bash`, `apply_diff`) in one tool call with persistent shell state and fast-fail semantics.
 
+## Project layout
+
+```
+batched-queue/
+├── README.md
+├── package.json
+├── src/                  # extension and library source
+│   ├── extension.ts      # Pi extension entry point
+│   ├── index.ts          # public API barrel export
+│   ├── executors/        # action executors
+│   ├── diff-validation/  # diff matching and syntax checks
+│   └── lib/              # shared utilities
+├── tests/                # unit, integration, and smoke tests
+└── scripts/
+    └── install.sh        # install helper
+```
+
 ## Requirements
 
 - [Pi coding agent](https://www.npmjs.com/package/@mariozechner/pi-coding-agent) on your `PATH`
@@ -35,14 +52,14 @@ bun run typecheck
 You can also load it without installing:
 
 ```bash
-pi -e ./extension.ts
+pi -e ./src/extension.ts
 ```
 
 Or use the helper script:
 
 ```bash
-chmod +x install.sh
-./install.sh
+chmod +x scripts/install.sh
+./scripts/install.sh
 ```
 
 ## Configuration

@@ -14,9 +14,9 @@ import {
 	validateAndPrepareDiff,
 	validateSyntax,
 	routeSyntaxLanguage,
-} from "./diff-validation";
-import { resolveBatchQueueConfig, parseModelRefString } from "./config";
-import { parseActionBatchPayload } from "./guards";
+} from "../src/diff-validation";
+import { resolveBatchQueueConfig, parseModelRefString } from "../src/config";
+import { parseActionBatchPayload } from "../src/guards";
 
 describe("semantic normalization", () => {
 	it("normalizes CRLF and trailing whitespace", () => {
