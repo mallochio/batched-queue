@@ -6,6 +6,7 @@
       "name": "@pi/batched-queue",
       "dependencies": {
         "@sinclair/typebox": "^0.34.0",
+        "typescript": "^5.8.0",
       },
       "devDependencies": {
         "@mariozechner/pi-ai": "*",
@@ -13,7 +14,6 @@
         "@mariozechner/pi-tui": "*",
         "@types/bun": "^1.3.14",
         "@types/node": "^22.0.0",
-        "typescript": "^5.8.0",
       },
     },
   },

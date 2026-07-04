@@ -25,14 +25,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@sinclair/typebox": "^0.34.0"
+    "@sinclair/typebox": "^0.34.0",
+    "typescript": "^5.8.0"
   },
   "devDependencies": {
     "@mariozechner/pi-ai": "*",
     "@mariozechner/pi-coding-agent": "*",
     "@mariozechner/pi-tui": "*",
     "@types/bun": "^1.3.14",
-    "@types/node": "^22.0.0",
-    "typescript": "^5.8.0"
+    "@types/node": "^22.0.0"
   }
 }
