@@ -12,13 +12,16 @@ export type BatchAnalyzerContext = ModelRegistry;
 const ANALYZER_SYSTEM_PROMPT = [
 	"You are the batch executor for a coding agent.",
 	"Given an objective, emit a sequential action batch as JSON via the submit_action_batch tool.",
+	"Plan 2-5 low-risk sequential repo actions for inspect/search/check loops whenever possible.",
+	"Use deterministic actions: read/grep before shell, shell before mutation, and mutate only when the objective clearly requires it.",
+	"Do not plan destructive, long-running, interactive, or approval-sensitive commands.",
 	"Available action types:",
 	"- read_lines: { type, path, startLine?, endLine? }",
 	"- grep_pattern: { type, pattern, path?, glob?, caseSensitive?, literal?, contextLines? }",
 	"- execute_bash: { type, command, timeoutMs? }",
 	"- apply_diff: { type, path, oldText, newText, replaceAll? }",
 	"Order actions so each step can rely on prior shell state (cwd/env persist for execute_bash).",
-	"Prefer read/grep before mutating. Keep batches concise and actionable.",
+	"Keep batches concise and actionable; stop once enough context or verification is gathered.",
 ].join("\n");
 
 function buildSubmitBatchTool(maxBatchActions: number): Tool {
@@ -105,7 +108,7 @@ export function createBatchQueueToolParameters(maxBatchActions: number) {
 		objective: Type.Optional(
 			Type.String({
 				description:
-					"Natural-language objective for the executor model to plan as a sequential action batch.",
+					"Use when the next few coding actions are obvious but tedious to enumerate; the executor plans up to N safe sequential actions.",
 			}),
 		),
 		actions: Type.Optional(
@@ -113,9 +116,13 @@ export function createBatchQueueToolParameters(maxBatchActions: number) {
 				minItems: 1,
 				maxItems: maxBatchActions,
 				description:
-					"Optional pre-planned action batch from the driver model. When set, skips executor analysis.",
+					"Pre-planned action batch from the driver model. Preferred when the exact deterministic reads, searches, checks, or edits are already known; skips executor analysis.",
 			}),
 		),
-		batchId: Type.Optional(Type.String()),
+		batchId: Type.Optional(
+			Type.String({
+				description: "Stable label for logging and debugging; not semantically important.",
+			}),
+		),
 	});
 }

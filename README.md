@@ -70,6 +70,20 @@ The `batch_queue` tool accepts either:
 - `objective`: an executor model plans the action batch
 - `actions`: a pre-planned batch supplied directly by the driver model
 
+For coding sessions, prefer `batch_queue` for small sequential inspect/search/check loops instead of making multiple individual tool calls.
+
+Use it when you need 2-5 low-risk sequential repo actions:
+
+- inspect files
+- search symbols or text
+- run small shell checks
+- apply a targeted diff
+- verify a local change
+
+Use `actions` when you already know the exact deterministic steps. Use `objective` when a cheaper executor model should plan the steps.
+
+Prefer `multi_tool_use.parallel` instead for independent parallel reads/searches. Do not use `batch_queue` for destructive, long-running, interactive, or approval-sensitive commands. File actions are workspace-scoped unless configured otherwise.
+
 ## Manage install
 
 ```bash
