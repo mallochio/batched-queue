@@ -1,0 +1,151 @@
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { resolveBatchQueueConfig } from "../src/config";
+import {
+	loadFileConfig,
+	parseBatchQueueJsonConfig,
+} from "../src/file-config";
+
+describe("parseBatchQueueJsonConfig", () => {
+	it("parses executor model shorthand", () => {
+		expect(parseBatchQueueJsonConfig({
+			executorModel: "openai/gpt-5.4-nano",
+		})).toEqual({
+			executorModel: { provider: "openai", id: "gpt-5.4-nano" },
+		});
+	});
+
+	it("parses executor model object form", () => {
+		expect(parseBatchQueueJsonConfig({
+			executorModel: { provider: "openai", id: "gpt-5.4-mini" },
+		})).toEqual({
+			executorModel: { provider: "openai", id: "gpt-5.4-mini" },
+		});
+	});
+
+	it("parses maxBatchActions", () => {
+		expect(parseBatchQueueJsonConfig({ maxBatchActions: 8 })).toEqual({
+			maxBatchActions: 8,
+		});
+	});
+
+	it("ignores invalid values", () => {
+		expect(parseBatchQueueJsonConfig({
+			maxBatchActions: "nope",
+			executorModel: { provider: "", id: "x" },
+		})).toEqual({});
+	});
+});
+
+describe("loadFileConfig", () => {
+	let tmpDir: string;
+	let packageJsonPath: string;
+	let projectConfigPath: string;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "bq-config-"));
+		packageJsonPath = path.join(tmpDir, "package.json");
+		projectConfigPath = path.join(tmpDir, ".pi", "batched-queue.json");
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it("loads executor model from package.json pi.batchQueue", () => {
+		fs.writeFileSync(packageJsonPath, JSON.stringify({
+			pi: {
+				batchQueue: {
+					executorModel: "openai/gpt-5.4-nano",
+				},
+			},
+		}));
+
+		const config = loadFileConfig({
+			cwd: tmpDir,
+			packageJsonPath,
+			projectConfigPath,
+		});
+
+		expect(config.executorModel).toEqual({
+			provider: "openai",
+			id: "gpt-5.4-nano",
+		});
+	});
+
+	it("lets project config override package defaults", () => {
+		fs.mkdirSync(path.dirname(projectConfigPath), { recursive: true });
+		fs.writeFileSync(packageJsonPath, JSON.stringify({
+			pi: {
+				batchQueue: {
+					executorModel: "openai/gpt-5.4-nano",
+					maxBatchActions: 3,
+				},
+			},
+		}));
+		fs.writeFileSync(projectConfigPath, JSON.stringify({
+			executorModel: "openai/gpt-5.4-mini",
+			maxBatchActions: 7,
+		}));
+
+		const config = loadFileConfig({
+			cwd: tmpDir,
+			packageJsonPath,
+			projectConfigPath,
+		});
+
+		expect(config).toEqual({
+			executorModel: { provider: "openai", id: "gpt-5.4-mini" },
+			maxBatchActions: 7,
+		});
+	});
+});
+
+describe("resolveBatchQueueConfig precedence", () => {
+	const savedExecutor = process.env.BATCH_QUEUE_EXECUTOR;
+
+	afterEach(() => {
+		if (savedExecutor === undefined) {
+			delete process.env.BATCH_QUEUE_EXECUTOR;
+		} else {
+			process.env.BATCH_QUEUE_EXECUTOR = savedExecutor;
+		}
+	});
+
+	it("prefers env vars over file config", () => {
+		process.env.BATCH_QUEUE_EXECUTOR = "openai/gpt-5.4-pro";
+		const resolved = resolveBatchQueueConfig({}, {
+			executorModel: { provider: "openai", id: "gpt-5.4-nano" },
+		});
+		expect(resolved.executorModel).toEqual({
+			provider: "openai",
+			id: "gpt-5.4-pro",
+		});
+	});
+
+	it("uses file config when env is unset", () => {
+		delete process.env.BATCH_QUEUE_EXECUTOR;
+		const resolved = resolveBatchQueueConfig({}, {
+			executorModel: { provider: "openai", id: "gpt-5.4-nano" },
+		});
+		expect(resolved.executorModel).toEqual({
+			provider: "openai",
+			id: "gpt-5.4-nano",
+		});
+	});
+
+	it("prefers factory overrides over env and file config", () => {
+		process.env.BATCH_QUEUE_EXECUTOR = "openai/gpt-5.4-pro";
+		const resolved = resolveBatchQueueConfig({
+			executorModel: { provider: "openai", id: "gpt-5.4-mini" },
+		}, {
+			executorModel: { provider: "openai", id: "gpt-5.4-nano" },
+		});
+		expect(resolved.executorModel).toEqual({
+			provider: "openai",
+			id: "gpt-5.4-mini",
+		});
+	});
+});

@@ -15,7 +15,7 @@ export interface ModelRef {
 
 /**
  * User-facing configuration for the batched queue extension.
- * Passed to the Pi extension factory and/or loaded from environment variables.
+ * Passed to the Pi extension factory, loaded from JSON files, and/or env vars.
  */
 export interface BatchQueueConfig {
 	/**
@@ -83,20 +83,27 @@ function parseExecutorFromEnv(): ModelRef | undefined {
 
 export function resolveBatchQueueConfig(
 	overrides: BatchQueueConfig = {},
+	fileConfig: BatchQueueConfig = {},
 ): ResolvedBatchQueueConfig {
 	const maxBatchActions =
 		overrides.maxBatchActions ??
 		parsePositiveInt(process.env[ENV_MAX_ACTIONS]) ??
+		fileConfig.maxBatchActions ??
 		DEFAULT_MAX_BATCH_ACTIONS;
 
 	const executorModel =
 		overrides.executorModel ??
-		parseExecutorFromEnv();
+		parseExecutorFromEnv() ??
+		fileConfig.executorModel;
 
 	return {
 		maxBatchActions,
 		...(executorModel ? { executorModel } : {}),
-		pathSecurity: { ...DEFAULT_PATH_SECURITY, ...overrides.pathSecurity },
+		pathSecurity: {
+			...DEFAULT_PATH_SECURITY,
+			...fileConfig.pathSecurity,
+			...overrides.pathSecurity,
+		},
 	};
 }
 

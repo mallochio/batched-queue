@@ -4,10 +4,11 @@
  * - Driver model: the main model selected in Pi (ctx.model) — invokes this tool
  * - Executor model: configurable fast model that plans action batches from objectives
  *
- * Configuration (extension factory config, env vars, or both):
- * - maxBatchActions / BATCH_QUEUE_MAX_ACTIONS (default 5)
- * - executorModel / BATCH_QUEUE_EXECUTOR_PROVIDER + BATCH_QUEUE_EXECUTOR_MODEL
- * - BATCH_QUEUE_EXECUTOR=provider/model shorthand
+ * Configuration (in priority order, highest wins):
+ * - extension factory overrides
+ * - environment variables (BATCH_QUEUE_*)
+ * - project `.pi/batched-queue.json`
+ * - package.json `pi.batchQueue`
  */
 
 import type { Api, Model } from "@mariozechner/pi-ai";
@@ -19,6 +20,7 @@ import {
 	type ModelRef,
 	type ResolvedBatchQueueConfig,
 } from "./config";
+import { loadFileConfig } from "./file-config";
 import { analyzeBatchObjective, createBatchQueueToolParameters } from "./analyzer";
 import { parseActionBatchPayloadWithConfig } from "./guards";
 import type { ActionBatchPayload } from "./payload";
@@ -48,9 +50,9 @@ function resolveExecutorRef(
 
 function executorDescription(config: ResolvedBatchQueueConfig): string {
 	if (config.executorModel) {
-		return `${config.executorModel.provider}/${config.executorModel.id} (BATCH_QUEUE_EXECUTOR override)`;
+		return `${config.executorModel.provider}/${config.executorModel.id} (configured executor model)`;
 	}
-	return "Pi session driver model (default; set BATCH_QUEUE_EXECUTOR to override)";
+	return "Pi session driver model (default; set executor in .pi/batched-queue.json, package.json pi.batchQueue, or BATCH_QUEUE_EXECUTOR)";
 }
 
 function formatBatchResult(result: BatchExecutionResult): string {
@@ -109,7 +111,10 @@ export function registerBatchedQueueExtension(
 	pi: ExtensionAPI,
 	config: BatchQueueConfig = {},
 ) {
-	const resolvedConfig: ResolvedBatchQueueConfig = resolveBatchQueueConfig(config);
+	const resolvedConfig: ResolvedBatchQueueConfig = resolveBatchQueueConfig(
+		config,
+		loadFileConfig(),
+	);
 	const runners = new Map<string, BatchQueueRunner>();
 
 	const disposeAllRunners = async () => {

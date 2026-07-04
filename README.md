@@ -64,6 +64,42 @@ chmod +x scripts/install.sh
 
 ## Configuration
 
+Settings are merged in this order (highest priority wins):
+
+1. Extension factory overrides (code)
+2. Environment variables
+3. Project `.pi/batched-queue.json`
+4. `package.json` → `pi.batchQueue` (package defaults)
+
+### JSON config
+
+Project-local config in `.pi/batched-queue.json`:
+
+```json
+{
+  "executorModel": "openai/gpt-5.4-nano",
+  "maxBatchActions": 5
+}
+```
+
+`executorModel` accepts either `provider/model` shorthand or `{ "provider": "...", "id": "..." }`.
+
+Package defaults can live in `package.json`:
+
+```json
+{
+  "pi": {
+    "batchQueue": {
+      "executorModel": "openai/gpt-5.4-nano"
+    }
+  }
+}
+```
+
+Copy `.pi/batched-queue.json.example` to `.pi/batched-queue.json` to get started.
+
+### Environment variables
+
 Optional environment variables:
 
 - `BATCH_QUEUE_MAX_ACTIONS`: max actions per batch, default `5`
@@ -79,6 +115,8 @@ Example:
 export BATCH_QUEUE_EXECUTOR=openai/gpt-5.4-nano
 pi --provider openai --model gpt-5.4-mini
 ```
+
+Or configure in `.pi/batched-queue.json` and skip the env var.
 
 ## Tool usage
 
