@@ -5,13 +5,7 @@ import {
 	MIN_BATCH_ACTIONS,
 	type ActionType,
 } from "./constants.js";
-import type {
-	QueueAction,
-	ReadLinesAction,
-	GrepPatternAction,
-	ExecuteBashAction,
-	ApplyDiffAction,
-} from "./actions.js";
+import type { QueueAction, ReadLinesAction } from "./actions.js";
 import type { ActionBatchPayload, UnvalidatedActionBatchPayload } from "./payload.js";
 import type { ActionExecutionResult } from "./results.js";
 import type { ResolvedBatchQueueConfig } from "./config.js";
@@ -19,30 +13,13 @@ import {
 	createActionBatchPayloadSchema,
 	QueueActionSchema,
 	type ActionBatchPayloadSchemaType,
-	type QueueActionFromSchema,
 } from "./schemas.js";
 
 export function isActionType(value: string): value is ActionType {
 	return (ACTION_TYPES as readonly string[]).includes(value);
 }
 
-export function isReadLinesAction(action: QueueAction): action is ReadLinesAction {
-	return action.type === "read_lines";
-}
-
-export function isGrepPatternAction(action: QueueAction): action is GrepPatternAction {
-	return action.type === "grep_pattern";
-}
-
-export function isExecuteBashAction(action: QueueAction): action is ExecuteBashAction {
-	return action.type === "execute_bash";
-}
-
-export function isApplyDiffAction(action: QueueAction): action is ApplyDiffAction {
-	return action.type === "apply_diff";
-}
-
-export function isQueueAction(value: unknown): value is QueueActionFromSchema {
+export function isQueueAction(value: unknown): value is QueueAction {
 	return Value.Check(QueueActionSchema, value);
 }
 

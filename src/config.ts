@@ -42,12 +42,6 @@ export interface ResolvedBatchQueueConfig {
 	readonly pathSecurity: PathSecurityConfig;
 }
 
-/** @deprecated Executor defaults to the Pi session driver model when unset. */
-export const DEFAULT_EXECUTOR_MODEL: ModelRef = {
-	provider: "openrouter",
-	id: "deepseek/deepseek-chat-v3-0324",
-};
-
 const ENV_MAX_ACTIONS = "BATCH_QUEUE_MAX_ACTIONS";
 const ENV_EXECUTOR = "BATCH_QUEUE_EXECUTOR";
 const ENV_EXECUTOR_PROVIDER = "BATCH_QUEUE_EXECUTOR_PROVIDER";

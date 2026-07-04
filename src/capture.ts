@@ -4,7 +4,8 @@ import type { CapturedStream, TruncationInfo } from "./truncation";
 import type { OutputLimits } from "./constants";
 import {
 	DEFAULT_PATH_SECURITY,
-	validatePath,
+	findWorkspaceRoot,
+	validateResolvedPath,
 	type PathSecurityConfig,
 } from "./lib/path-security";
 
@@ -30,9 +31,11 @@ export function resolveAndValidatePath(
 	filePath: string,
 	workspaceRoot: string,
 	config: PathSecurityConfig = DEFAULT_PATH_SECURITY,
+	gitWorkspaceRoot?: string,
 ): ResolvedPathValidation {
 	const resolvedPath = resolveToAbsolute(filePath, workspaceRoot);
-	const validation = validatePath(resolvedPath, workspaceRoot, config);
+	const gitRoot = gitWorkspaceRoot ?? findWorkspaceRoot(workspaceRoot);
+	const validation = validateResolvedPath(resolvedPath, config, gitRoot);
 
 	return {
 		allowed: validation.allowed,

@@ -5,6 +5,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { globToRegex } from "./glob.js";
 
 export type PermissionAction = "allow" | "reject" | "ask";
 
@@ -30,12 +31,6 @@ export function registerAskCallback(callback: (prompt: string) => Promise<boolea
 
 export function unregisterAskCallback(): void {
 	askCallback = null;
-}
-
-function globToRegex(pattern: string): RegExp {
-	const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-	const withWildcards = escaped.replace(/\*/g, ".*?");
-	return new RegExp(`^${withWildcards}$`, "i");
 }
 
 function matchesAnyPattern(value: string, patterns: string | string[]): boolean {

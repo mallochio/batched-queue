@@ -10,13 +10,11 @@ export interface PathSecurityConfig {
 	allowOutsideWorkspace: boolean;
 	allowedPaths: string[];
 	blockSensitivePaths: boolean;
-	confirmPatterns: string[];
 }
 
 export interface PathValidationResult {
 	allowed: boolean;
 	reason?: string;
-	requiresConfirmation?: boolean;
 	resolvedPath: string;
 }
 
@@ -91,53 +89,34 @@ function isSensitivePath(resolved: string): boolean {
 	return false;
 }
 
-function matchesConfirmPattern(resolved: string, patterns: string[]): boolean {
-	for (const pattern of patterns) {
-		const regex = globToRegex(pattern);
-		if (regex.test(resolved)) return true;
-	}
-	return false;
-}
-
-function globToRegex(pattern: string): RegExp {
-	const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-	const withWildcards = escaped.replace(/\*/g, ".*");
-	return new RegExp(`^${withWildcards}$`, "i");
-}
-
-export function validatePath(
-	filePath: string,
-	cwd: string,
+/** Validate an already-resolved absolute path against security policy. */
+export function validateResolvedPath(
+	resolvedPath: string,
 	config: PathSecurityConfig,
+	gitWorkspaceRoot: string,
 ): PathValidationResult {
-	const resolved = path.resolve(cwd, filePath);
-
-	if (config.blockSensitivePaths && isSensitivePath(resolved)) {
+	if (config.blockSensitivePaths && isSensitivePath(resolvedPath)) {
 		return {
 			allowed: false,
-			reason: `access blocked: ${resolved} is a sensitive system path (credentials, keys, or system config)`,
-			resolvedPath: resolved,
+			reason: `access blocked: ${resolvedPath} is a sensitive system path (credentials, keys, or system config)`,
+			resolvedPath,
 		};
 	}
 
-	const workspaceRoot = findWorkspaceRoot(cwd);
-	const allowedPaths = [workspaceRoot, ...config.allowedPaths];
-	const withinAllowed = isWithinAllowedPath(resolved, allowedPaths);
+	const allowedPaths = [gitWorkspaceRoot, ...config.allowedPaths];
+	const withinAllowed = isWithinAllowedPath(resolvedPath, allowedPaths);
 
 	if (!withinAllowed && !config.allowOutsideWorkspace) {
 		return {
 			allowed: false,
-			reason: `path outside workspace: ${resolved}\nworkspace root: ${workspaceRoot}\nset allowOutsideWorkspace: true in config to allow`,
-			resolvedPath: resolved,
+			reason: `path outside workspace: ${resolvedPath}\nworkspace root: ${gitWorkspaceRoot}\nset allowOutsideWorkspace: true in config to allow`,
+			resolvedPath,
 		};
 	}
 
-	const requiresConfirmation = matchesConfirmPattern(resolved, config.confirmPatterns);
-
 	return {
 		allowed: true,
-		requiresConfirmation,
-		resolvedPath: resolved,
+		resolvedPath,
 	};
 }
 
@@ -145,33 +124,29 @@ export const DEFAULT_PATH_SECURITY: PathSecurityConfig = {
 	allowOutsideWorkspace: false,
 	allowedPaths: [],
 	blockSensitivePaths: true,
-	confirmPatterns: [
-		"**/package.json",
-		"**/Cargo.toml",
-		"**/go.mod",
-		"**/*.lock",
-		"**/.gitignore",
-	],
 };
 
-export function createPathValidator(config: Partial<PathSecurityConfig> = {}) {
+export function createPathValidator(
+	config: Partial<PathSecurityConfig> = {},
+	gitWorkspaceRoot?: string,
+) {
 	const merged = { ...DEFAULT_PATH_SECURITY, ...config };
 
+	const validate = (filePath: string, cwd: string) => {
+		const resolved = path.resolve(cwd, filePath);
+		const root = gitWorkspaceRoot ?? findWorkspaceRoot(cwd);
+		return validateResolvedPath(resolved, merged, root);
+	};
+
 	return {
-		validate: (filePath: string, cwd: string) =>
-			validatePath(filePath, cwd, merged),
+		validate,
 
 		validateOrThrow: (filePath: string, cwd: string) => {
-			const result = validatePath(filePath, cwd, merged);
+			const result = validate(filePath, cwd);
 			if (!result.allowed) {
 				throw new Error(result.reason);
 			}
 			return result;
-		},
-
-		requiresConfirmation: (filePath: string, cwd: string) => {
-			const result = validatePath(filePath, cwd, merged);
-			return result.requiresConfirmation ?? false;
 		},
 	};
 }

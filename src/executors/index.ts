@@ -5,14 +5,17 @@ import { DEFAULT_COMMAND_TIMEOUT_MS } from "../constants";
 import type { PersistentShell } from "../persistent-shell";
 import type { ShellSessionState } from "../state";
 import type { PathSecurityConfig } from "../lib/path-security";
+import { matchQueueAction } from "../guards";
 import { executeReadLines } from "./read-lines";
 import { executeGrepPattern } from "./grep-pattern";
 import { executeBashCommand } from "./execute-bash";
 import { executeApplyDiff } from "./apply-diff";
 
 export interface ExecutorContext {
-	/** Workspace root used for path resolution and security boundary checks. */
+	/** Session cwd used for relative path resolution. */
 	readonly workspaceRoot: string;
+	/** Git workspace root cached once per runner (avoids repeated directory walks). */
+	readonly gitWorkspaceRoot: string;
 	readonly pathSecurity?: PathSecurityConfig;
 	readonly shell: PersistentShell;
 	readonly shellState: ShellSessionState;
@@ -25,37 +28,36 @@ export async function executeQueueAction(
 	index: number,
 	ctx: ExecutorContext,
 ): Promise<ActionExecutionResult> {
-	switch (action.type) {
-		case "read_lines":
-			return executeReadLines(action, index, {
+	return matchQueueAction<Promise<ActionExecutionResult>>(action, {
+		read_lines: async (readAction) =>
+			executeReadLines(readAction, index, {
 				workspaceRoot: ctx.workspaceRoot,
+				gitWorkspaceRoot: ctx.gitWorkspaceRoot,
 				pathSecurity: ctx.pathSecurity,
 				limits: ctx.limits,
-			});
-		case "grep_pattern":
-			return executeGrepPattern(action, index, {
+			}),
+		grep_pattern: async (grepAction) =>
+			executeGrepPattern(grepAction, index, {
 				workspaceRoot: ctx.workspaceRoot,
+				gitWorkspaceRoot: ctx.gitWorkspaceRoot,
 				pathSecurity: ctx.pathSecurity,
 				limits: ctx.limits,
 				defaultTimeoutMs: ctx.defaultTimeoutMs,
-			});
-		case "execute_bash":
-			return executeBashCommand(action, index, {
+			}),
+		execute_bash: async (bashAction) =>
+			executeBashCommand(bashAction, index, {
 				shell: ctx.shell,
 				shellState: ctx.shellState,
 				limits: ctx.limits,
 				defaultTimeoutMs: ctx.defaultTimeoutMs,
-			});
-		case "apply_diff":
-			return executeApplyDiff(action, index, {
+			}),
+		apply_diff: async (diffAction) =>
+			executeApplyDiff(diffAction, index, {
 				workspaceRoot: ctx.workspaceRoot,
+				gitWorkspaceRoot: ctx.gitWorkspaceRoot,
 				pathSecurity: ctx.pathSecurity,
-			});
-		default: {
-			const _exhaustive: never = action;
-			throw new Error(`Unhandled action type: ${(_exhaustive as QueueAction).type}`);
-		}
-	}
+			}),
+	});
 }
 
 export { DEFAULT_COMMAND_TIMEOUT_MS };

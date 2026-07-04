@@ -56,6 +56,7 @@ export const QueueActionSchema = Type.Union([
 ]);
 
 export type QueueActionFromSchema = Static<typeof QueueActionSchema>;
+/** @deprecated Alias for QueueActionFromSchema. */
 export type QueueActionSchemaType = QueueActionFromSchema;
 
 export function createActionBatchPayloadSchema(maxBatchActions: number = DEFAULT_MAX_BATCH_ACTIONS) {

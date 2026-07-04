@@ -8,6 +8,7 @@ import type { PathSecurityConfig } from "../lib/path-security";
 
 export interface ApplyDiffExecutionContext {
 	readonly workspaceRoot: string;
+	readonly gitWorkspaceRoot: string;
 	readonly pathSecurity?: PathSecurityConfig;
 }
 
@@ -21,6 +22,7 @@ export async function executeApplyDiff(
 		action.path,
 		ctx.workspaceRoot,
 		ctx.pathSecurity,
+		ctx.gitWorkspaceRoot,
 	);
 	if (!pathResult.allowed) {
 		return {

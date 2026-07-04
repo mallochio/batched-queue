@@ -70,7 +70,6 @@ export type {
 } from "./config";
 
 export {
-	DEFAULT_EXECUTOR_MODEL,
 	resolveBatchQueueConfig,
 	parseModelRefString,
 } from "./config";
@@ -93,6 +92,7 @@ export {
 	ExecuteBashActionSchema,
 	ApplyDiffActionSchema,
 	ActionTypeSchema,
+	/** @deprecated Use QueueAction from ./actions instead. */
 	type QueueActionFromSchema,
 	type QueueActionSchemaType,
 	type ActionBatchPayloadSchemaType,
@@ -101,10 +101,6 @@ export {
 
 export {
 	isActionType,
-	isReadLinesAction,
-	isGrepPatternAction,
-	isExecuteBashAction,
-	isApplyDiffAction,
 	isQueueAction,
 	assertQueueAction,
 	isActionBatchPayload,

@@ -13,6 +13,7 @@ import type { PathSecurityConfig } from "../lib/path-security";
 
 export interface ReadLinesExecutionContext {
 	readonly workspaceRoot: string;
+	readonly gitWorkspaceRoot: string;
 	readonly limits: OutputLimits;
 	readonly pathSecurity?: PathSecurityConfig;
 }
@@ -44,6 +45,7 @@ export function executeReadLines(
 		action.path,
 		ctx.workspaceRoot,
 		ctx.pathSecurity,
+		ctx.gitWorkspaceRoot,
 	);
 	if (!pathResult.allowed) {
 		return {

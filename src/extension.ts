@@ -25,6 +25,7 @@ import { analyzeBatchObjective, createBatchQueueToolParameters } from "./analyze
 import { parseActionBatchPayloadWithConfig } from "./guards";
 import type { ActionBatchPayload } from "./payload";
 import type { BatchExecutionResult } from "./results";
+import { formatBatchResult } from "./format-batch-result";
 import { BatchQueueRunner } from "./queue-runner";
 
 interface BatchQueueToolDetails {
@@ -53,58 +54,6 @@ function executorDescription(config: ResolvedBatchQueueConfig): string {
 		return `${config.executorModel.provider}/${config.executorModel.id} (configured executor model)`;
 	}
 	return "Pi session driver model (default; set executor in .pi/batched-queue.json, package.json pi.batchQueue, or BATCH_QUEUE_EXECUTOR)";
-}
-
-function formatBatchResult(result: BatchExecutionResult): string {
-	const lines: string[] = [];
-	lines.push(
-		result.haltedPrematurely
-			? `batch halted at action ${result.haltedAtIndex ?? "?"} (${result.haltReason})`
-			: "batch completed successfully",
-	);
-	lines.push(`completed ${result.completedCount}/${result.totalRequested} actions in ${result.durationMs}ms`);
-	lines.push(`shell cwd: ${result.shellState.cwd}`);
-
-	for (const actionResult of result.results) {
-		lines.push("");
-		lines.push(
-			`[${actionResult.index}] ${actionResult.type} exit=${actionResult.exitCode} ${actionResult.success ? "ok" : "FAIL"}`,
-		);
-		if (actionResult.error) {
-			lines.push(`  error: ${actionResult.error}`);
-		}
-		switch (actionResult.type) {
-			case "read_lines":
-				if (actionResult.formatted) {
-					lines.push(actionResult.formatted.split("\n").slice(0, 20).map((l) => `  ${l}`).join("\n"));
-				}
-				break;
-			case "grep_pattern":
-				for (const match of actionResult.matches.slice(0, 10)) {
-					lines.push(`  ${match.path}:${match.lineNumber}: ${match.text}`);
-				}
-				break;
-			case "execute_bash":
-				if (actionResult.stdout.text) {
-					lines.push(`  stdout:\n${actionResult.stdout.text.split("\n").map((l) => `    ${l}`).join("\n")}`);
-				}
-				if (actionResult.stderr.text) {
-					lines.push(`  stderr:\n${actionResult.stderr.text.split("\n").map((l) => `    ${l}`).join("\n")}`);
-				}
-				break;
-			case "apply_diff":
-				lines.push(
-					`  applied=${actionResult.applied} strategy=${actionResult.matchStrategy ?? "n/a"} bytes ${actionResult.bytesBefore}->${actionResult.bytesAfter}`,
-				);
-				break;
-			default: {
-				const _exhaustive: never = actionResult;
-				void _exhaustive;
-			}
-		}
-	}
-
-	return lines.join("\n");
 }
 
 export function registerBatchedQueueExtension(

@@ -18,7 +18,7 @@ import {
 import { createPersistentShell, type PersistentShell } from "./persistent-shell";
 import { executeQueueAction } from "./executors";
 import { DEFAULT_FAILURE_HALT_REASON } from "./results";
-import { DEFAULT_PATH_SECURITY, type PathSecurityConfig } from "./lib/path-security";
+import { DEFAULT_PATH_SECURITY, findWorkspaceRoot, type PathSecurityConfig } from "./lib/path-security";
 
 export interface BatchQueueRunnerOptions {
 	readonly limits?: Partial<OutputLimits>;
@@ -51,6 +51,7 @@ export class BatchQueueRunner {
 	private readonly defaultCommandTimeoutMs: number;
 	private readonly env: Record<string, string>;
 	private readonly pathSecurity: PathSecurityConfig;
+	private gitWorkspaceRoot: string;
 	private session: BatchQueueSessionState;
 	private shell: PersistentShell | null = null;
 	private shellStale = false;
@@ -65,6 +66,7 @@ export class BatchQueueRunner {
 			options.defaultCommandTimeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS;
 		this.env = options.env ?? {};
 		this.pathSecurity = options.pathSecurity ?? DEFAULT_PATH_SECURITY;
+		this.gitWorkspaceRoot = findWorkspaceRoot(workspaceRoot);
 		this.session = createInitialBatchQueueSessionState(
 			sessionId,
 			workspaceRoot,
@@ -82,6 +84,7 @@ export class BatchQueueRunner {
 			return;
 		}
 		this.session.workspaceRoot = workspaceRoot;
+		this.gitWorkspaceRoot = findWorkspaceRoot(workspaceRoot);
 		this.session.updatedAtMs = Date.now();
 		this.shellStale = true;
 	}
@@ -138,6 +141,7 @@ export class BatchQueueRunner {
 				const action = payload.actions[index];
 				const result = await executeQueueAction(action, index, {
 					workspaceRoot: this.session.workspaceRoot,
+					gitWorkspaceRoot: this.gitWorkspaceRoot,
 					pathSecurity: this.pathSecurity,
 					shell,
 					shellState: this.session.shell,

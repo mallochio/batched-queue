@@ -9,6 +9,7 @@ import type { PathSecurityConfig } from "../lib/path-security";
 
 export interface GrepPatternExecutionContext {
 	readonly workspaceRoot: string;
+	readonly gitWorkspaceRoot: string;
 	readonly limits: OutputLimits;
 	readonly pathSecurity?: PathSecurityConfig;
 	readonly defaultTimeoutMs: number;
@@ -24,6 +25,7 @@ export async function executeGrepPattern(
 		action.path ?? ".",
 		ctx.workspaceRoot,
 		ctx.pathSecurity,
+		ctx.gitWorkspaceRoot,
 	);
 	if (!pathResult.allowed) {
 		return {
