@@ -11,9 +11,9 @@
  * - package.json `pi.batchQueue`
  */
 
-import type { Api, Model } from "@mariozechner/pi-ai";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
+import type { Api, Model } from "@earendil-works/pi-ai";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import {
 	type BatchQueueConfig,
 	resolveBatchQueueConfig,
@@ -105,12 +105,22 @@ export function registerBatchedQueueExtension(
 			"For coding work, default to this tool for small sequential inspect/search/check loops instead of making multiple individual read, grep, or bash calls.\n" +
 			`Maximum ${resolvedConfig.maxBatchActions} actions per batch (configurable).\n\n` +
 			"Prefer this tool when you need 2-5 low-risk sequential repo actions, such as inspecting files, searching symbols/text, running small shell checks, applying a targeted diff, or verifying a local change.\n" +
-			"Use `actions` when you already know the exact deterministic steps. Use `objective` when a cheaper executor model should plan the steps.\n" +
+			"Use `actions` when you already know the exact deterministic steps. Use `objective` when a cheaper executor model should plan read/check-only steps.\n" +
+			"Objective-planned mutations are disabled by default; pass explicit `actions` for apply_diff or enable allowObjectiveMutations in config.\n" +
 			"Prefer `multi_tool_use.parallel` instead for independent parallel reads/searches. Do not use this tool for destructive, long-running, interactive, or approval-sensitive commands.\n\n" +
 			"Action types: read_lines, grep_pattern, execute_bash, apply_diff.\n" +
 			"Fast-fail: batch halts on first non-zero exit or validation failure. File actions are workspace-scoped unless configured otherwise.\n" +
 			"Driver model: Pi session model (ctx.model).\n" +
 			`Executor model: ${executorDescription(resolvedConfig)}`,
+		promptSnippet:
+			"Batch 1-5 safe sequential repo actions: read, grep, short bash, or targeted diff",
+		promptGuidelines: [
+			"Use batch_queue for 2-5 safe sequential repo actions such as read, grep, and short checks.",
+			"Prefer explicit batch_queue actions when the exact steps are known.",
+			"Use batch_queue objective for read/check-only planning; pass explicit actions for apply_diff unless allowObjectiveMutations is enabled.",
+			"Do not use batch_queue for long-running, interactive, destructive, or judgment-dependent steps.",
+		],
+		executionMode: "sequential",
 
 		parameters: createBatchQueueToolParameters(resolvedConfig.maxBatchActions),
 

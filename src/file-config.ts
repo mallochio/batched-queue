@@ -9,6 +9,7 @@ const PROJECT_CONFIG_RELATIVE = path.join(".pi", "batched-queue.json");
 export interface BatchQueueJsonConfig {
 	readonly maxBatchActions?: number;
 	readonly executorModel?: string | ModelRef;
+	readonly allowObjectiveMutations?: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -43,6 +44,10 @@ export function parseBatchQueueJsonConfig(raw: unknown): BatchQueueConfig {
 	const executorModel = parseModelRefValue(raw.executorModel);
 	if (executorModel) {
 		config.executorModel = executorModel;
+	}
+
+	if (typeof raw.allowObjectiveMutations === "boolean") {
+		config.allowObjectiveMutations = raw.allowObjectiveMutations;
 	}
 
 	return config;

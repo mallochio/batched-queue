@@ -18,7 +18,7 @@ pi_bin() {
 	elif [ -x "$ROOT/node_modules/.bin/pi" ]; then
 		echo "$ROOT/node_modules/.bin/pi"
 	else
-		echo "npx --yes @mariozechner/pi-coding-agent"
+		echo "npx --yes @earendil-works/pi-coding-agent"
 	fi
 }
 
@@ -26,7 +26,7 @@ run_pi() {
 	local bin
 	bin="$(pi_bin)"
 	if [[ "$bin" == npx* ]]; then
-		npx --yes @mariozechner/pi-coding-agent "$@"
+		npx --yes @earendil-works/pi-coding-agent "$@"
 	else
 		"$bin" "$@"
 	fi
@@ -57,7 +57,7 @@ EOF
 done
 
 if ! $VERIFY_ONLY && ! command -v pi >/dev/null 2>&1 && [ ! -x "$ROOT/node_modules/.bin/pi" ]; then
-	echo "note: pi not on PATH; will use npx @mariozechner/pi-coding-agent for registration."
+	echo "note: pi not on PATH; will use npx @earendil-works/pi-coding-agent for registration."
 fi
 
 if ! command -v rg >/dev/null 2>&1; then
