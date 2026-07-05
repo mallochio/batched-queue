@@ -22,11 +22,13 @@ import {
 } from "./config";
 import { loadFileConfig } from "./file-config";
 import { analyzeBatchObjective, createBatchQueueToolParameters } from "./analyzer";
-import { parseActionBatchPayloadWithConfig } from "./guards";
-import type { ActionBatchPayload } from "./payload";
 import type { BatchExecutionResult } from "./results";
-import { formatBatchResult } from "./format-batch-result";
-import { BatchQueueRunner } from "./queue-runner";
+import {
+	createRunnerMap,
+	disposeAllRunners,
+	executeBatchQueue,
+} from "./execute-batch-queue";
+import { buildBatchQueueDescription } from "./tool-description";
 
 interface BatchQueueToolDetails {
 	readonly driverModel: { readonly provider: string; readonly id: string };
@@ -64,54 +66,25 @@ export function registerBatchedQueueExtension(
 		config,
 		loadFileConfig(),
 	);
-	const runners = new Map<string, BatchQueueRunner>();
-
-	const disposeAllRunners = async () => {
-		for (const sessionId of [...runners.keys()]) {
-			const runner = runners.get(sessionId);
-			if (runner) {
-				await runner.dispose();
-			}
-			runners.delete(sessionId);
-		}
-	};
-
-	const getRunner = (sessionId: string, cwd: string): BatchQueueRunner => {
-		let runner = runners.get(sessionId);
-		if (!runner) {
-			runner = new BatchQueueRunner(sessionId, cwd, {
-				pathSecurity: resolvedConfig.pathSecurity,
-			});
-			runners.set(sessionId, runner);
-		} else {
-			runner.syncWorkspaceRoot(cwd);
-		}
-		return runner;
-	};
+	const runners = createRunnerMap();
 
 	pi.on("session_before_switch", async () => {
-		await disposeAllRunners();
+		await disposeAllRunners(runners);
 	});
 
 	pi.on("session_shutdown", async () => {
-		await disposeAllRunners();
+		await disposeAllRunners(runners);
 	});
+
+	const description = buildBatchQueueDescription(
+		resolvedConfig,
+		`Driver model: Pi session model (ctx.model).\nExecutor model: ${executorDescription(resolvedConfig)}`,
+	);
 
 	pi.registerTool({
 		name: "batch_queue",
 		label: "Batch Queue",
-		description:
-			"Execute up to N sequential coding actions in one low-latency batch with persistent shell state.\n\n" +
-			"For coding work, default to this tool for small sequential inspect/search/check loops instead of making multiple individual read, grep, or bash calls.\n" +
-			`Maximum ${resolvedConfig.maxBatchActions} actions per batch (configurable).\n\n` +
-			"Prefer this tool when you need 2-5 low-risk sequential repo actions, such as inspecting files, searching symbols/text, running small shell checks, applying a targeted diff, or verifying a local change.\n" +
-			"Use `actions` when you already know the exact deterministic steps. Use `objective` when a cheaper executor model should plan read/check-only steps.\n" +
-			"Objective-planned mutations are disabled by default; pass explicit `actions` for apply_diff or enable allowObjectiveMutations in config.\n" +
-			"Prefer `multi_tool_use.parallel` instead for independent parallel reads/searches. Do not use this tool for destructive, long-running, interactive, or approval-sensitive commands.\n\n" +
-			"Action types: read_lines, grep_pattern, execute_bash, apply_diff.\n" +
-			"Fast-fail: batch halts on first non-zero exit or validation failure. File actions are workspace-scoped unless configured otherwise.\n" +
-			"Driver model: Pi session model (ctx.model).\n" +
-			`Executor model: ${executorDescription(resolvedConfig)}`,
+		description,
 		promptSnippet:
 			"Batch 1-5 safe sequential repo actions: read, grep, short bash, or targeted diff",
 		promptGuidelines: [
@@ -157,53 +130,37 @@ export function registerBatchedQueueExtension(
 				};
 			}
 
-			let payload: ActionBatchPayload;
+			const executeResult = await executeBatchQueue({
+				config: resolvedConfig,
+				params,
+				signal,
+				runners,
+				deps: {
+					getSessionId: () => ctx.sessionManager.getSessionId(),
+					getCwd: () => ctx.cwd,
+					resolveObjective: (objective) =>
+						analyzeBatchObjective(
+							objective,
+							driverModel,
+							ctx.modelRegistry,
+							resolvedConfig,
+							signal,
+						),
+				},
+			});
 
-			try {
-				if (params.actions && params.actions.length > 0) {
-					payload = parseActionBatchPayloadWithConfig(
-						{ actions: params.actions, batchId: params.batchId },
-						resolvedConfig,
-					);
-				} else if (params.objective?.trim()) {
-					payload = await analyzeBatchObjective(
-						params.objective.trim(),
-						driverModel,
-						ctx.modelRegistry,
-						resolvedConfig,
-						signal,
-					);
-					if (params.batchId) {
-						payload = { ...payload, batchId: params.batchId };
-					}
-				} else {
-					return {
-						content: [{
-							type: "text",
-							text: "batch_queue requires either `objective` (executor plans batch) or `actions` (driver supplies batch)",
-						}],
-						details: { error: "missing objective or actions" } satisfies BatchQueueToolErrorDetails,
-						isError: true,
-					};
-				}
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
+			if (executeResult.error && !executeResult.result) {
 				return {
-					content: [{ type: "text", text: `batch_queue planning failed: ${message}` }],
-					details: { error: message } satisfies BatchQueueToolErrorDetails,
-					isError: true,
+					content: [{ type: "text", text: executeResult.text }],
+					details: { error: executeResult.error } satisfies BatchQueueToolErrorDetails,
+					isError: executeResult.isError,
 				};
 			}
-
-			const sessionId = ctx.sessionManager.getSessionId();
-			const runner = getRunner(sessionId, ctx.cwd);
-			const result = await runner.executeBatch(payload);
-			const text = formatBatchResult(result);
 
 			const executorModel = resolveExecutorRef(driverModel, resolvedConfig);
 
 			return {
-				content: [{ type: "text", text }],
+				content: [{ type: "text", text: executeResult.text }],
 				details: {
 					driverModel: {
 						provider: driverModel.provider,
@@ -211,9 +168,9 @@ export function registerBatchedQueueExtension(
 					},
 					executorModel,
 					maxBatchActions: resolvedConfig.maxBatchActions,
-					result,
+					result: executeResult.result!,
 				} satisfies BatchQueueToolDetails,
-				isError: result.haltedPrematurely,
+				isError: executeResult.isError,
 			};
 		},
 	});

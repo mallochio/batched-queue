@@ -80,7 +80,7 @@ export async function resolveCompleteImplementation(): Promise<CompleteImplement
 	return completeImplementationPromise;
 }
 
-function analyzerSystemPrompt(config: ResolvedBatchQueueConfig): string {
+export function analyzerSystemPrompt(config: ResolvedBatchQueueConfig): string {
 	const mutationGuidance = config.allowObjectiveMutations
 		? [
 			"Mutate only when the objective clearly requires it.",
@@ -133,7 +133,7 @@ function extractBatchFromResponse(
 	return parseActionBatchPayload(toolCall.arguments, maxBatchActions);
 }
 
-function assertObjectiveMutationPolicy(
+export function assertObjectiveMutationPolicy(
 	payload: ActionBatchPayload,
 	config: ResolvedBatchQueueConfig,
 ): void {

@@ -1,6 +1,6 @@
 # batched-queue
 
-Stateful batched action queue for [Pi](https://github.com/earendil-works/pi-mono) coding agent sessions. It executes up to N sequential actions (`read_lines`, `grep_pattern`, `execute_bash`, `apply_diff`) in one tool call with persistent shell state and fast-fail semantics.
+Stateful batched action queue for [Pi](https://github.com/earendil-works/pi-mono) and [OpenCode](https://opencode.ai) coding agent sessions. It executes up to N sequential actions (`read_lines`, `grep_pattern`, `execute_bash`, `apply_diff`) in one tool call with persistent shell state and fast-fail semantics.
 
 ## Project layout
 
@@ -10,13 +10,17 @@ batched-queue/
 ├── package.json
 ├── src/                  # extension and library source
 │   ├── extension.ts      # Pi extension entry point
+│   ├── opencode/         # OpenCode plugin adapter
 │   ├── index.ts          # public API barrel export
 │   ├── executors/        # action executors
 │   ├── diff-validation/  # diff matching and syntax checks
 │   └── lib/              # shared utilities
+├── .opencode/            # OpenCode plugin entry + install docs
+├── .pi/                  # Pi config example
 ├── tests/                # unit, integration, and smoke tests
 └── scripts/
-    └── install.sh        # install helper
+    ├── install.sh        # Pi install helper
+    └── install-opencode.sh
 ```
 
 ## Requirements
@@ -40,6 +44,30 @@ pi install -l https://github.com/mallochio/batched-queue
 ```
 
 Pi stores the package under `packages` in settings, so you do not need a separate `extensions` entry.
+
+## OpenCode install
+
+Add one line to `~/.config/opencode/opencode.json` (or project `opencode.json`):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [
+    "batched-queue@git+https://github.com/mallochio/batched-queue.git"
+  ]
+}
+```
+
+Restart OpenCode. See [.opencode/INSTALL.md](.opencode/INSTALL.md) for local dev, config, and troubleshooting.
+
+Or use the helper script:
+
+```bash
+chmod +x scripts/install-opencode.sh
+./scripts/install-opencode.sh
+```
+
+OpenCode configuration uses `.opencode/batched-queue.json` and `package.json` → `opencode.batchQueue`. Objective mode requires an explicit `executorModel` (unlike Pi, which can fall back to the session driver model).
 
 ## Local development
 

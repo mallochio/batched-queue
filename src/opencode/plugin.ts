@@ -1,0 +1,106 @@
+import type { Plugin, PluginInput } from "@opencode-ai/plugin";
+import type { Event } from "@opencode-ai/sdk";
+import { tool } from "@opencode-ai/plugin";
+import {
+	type BatchQueueConfig,
+	resolveBatchQueueConfig,
+	type ResolvedBatchQueueConfig,
+} from "../config.js";
+import {
+	createRunnerMap,
+	disposeAllRunners,
+	executeBatchQueue,
+} from "../execute-batch-queue.js";
+import { buildBatchQueueDescription } from "../tool-description.js";
+import { analyzeOpenCodeBatchObjective } from "./analyzer.js";
+import { loadOpenCodeFileConfig } from "./file-config.js";
+import { createBatchQueueZodArgs } from "./schemas-zod.js";
+
+type OpenCodeClient = PluginInput["client"];
+
+function openCodeExecutorDescription(config: ResolvedBatchQueueConfig): string {
+	if (config.executorModel) {
+		return `${config.executorModel.provider}/${config.executorModel.id} (configured executor model)`;
+	}
+	return "required for objective mode (.opencode/batched-queue.json, opencode.batchQueue, or BATCH_QUEUE_EXECUTOR)";
+}
+
+function sessionIdFromDeletedEvent(event: Event): string | undefined {
+	if (event.type !== "session.deleted") {
+		return undefined;
+	}
+	return event.properties.info.id;
+}
+
+export function createBatchedQueuePluginHooks(
+	resolvedConfig: ResolvedBatchQueueConfig,
+	client: OpenCodeClient,
+) {
+	const runners = createRunnerMap();
+
+	return {
+		event: async ({ event }: { readonly event: Event }) => {
+			const sessionID = sessionIdFromDeletedEvent(event);
+			if (!sessionID) {
+				return;
+			}
+			const runner = runners.get(sessionID);
+			if (runner) {
+				await runner.dispose();
+				runners.delete(sessionID);
+			}
+		},
+		tool: {
+			batch_queue: tool({
+				description: buildBatchQueueDescription(
+					resolvedConfig,
+					openCodeExecutorDescription(resolvedConfig),
+				),
+				args: createBatchQueueZodArgs(resolvedConfig),
+				async execute(args, context) {
+					const executeResult = await executeBatchQueue({
+						config: resolvedConfig,
+						params: args,
+						runners,
+						deps: {
+							getSessionId: () => context.sessionID,
+							getCwd: () => context.directory,
+							resolveObjective: (objective) =>
+								analyzeOpenCodeBatchObjective(
+									client,
+									context.sessionID,
+									objective,
+									resolvedConfig,
+								),
+						},
+					});
+
+					if (executeResult.isError) {
+						return `ERROR: ${executeResult.text}`;
+					}
+					return executeResult.text;
+				},
+			}),
+		},
+	};
+}
+
+export const BatchedQueuePlugin: Plugin = async ({ client, directory }) => {
+	const resolvedConfig = resolveBatchQueueConfig({}, loadOpenCodeFileConfig({ cwd: directory }));
+	return createBatchedQueuePluginHooks(resolvedConfig, client);
+};
+
+export function registerBatchedQueueOpenCodePlugin(
+	config: BatchQueueConfig = {},
+	directory?: string,
+) {
+	const resolvedConfig = resolveBatchQueueConfig(
+		config,
+		loadOpenCodeFileConfig({ cwd: directory }),
+	);
+	return {
+		resolvedConfig,
+		createHooks: (client: OpenCodeClient) =>
+			createBatchedQueuePluginHooks(resolvedConfig, client),
+	};
+}
