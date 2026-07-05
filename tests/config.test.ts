@@ -5,6 +5,7 @@ import * as path from "node:path";
 import { resolveBatchQueueConfig } from "../src/config";
 import {
 	loadFileConfig,
+	loadOpenCodeFileConfig,
 	parseBatchQueueJsonConfig,
 } from "../src/file-config";
 
@@ -109,6 +110,65 @@ describe("loadFileConfig", () => {
 			maxBatchActions: 7,
 			allowObjectiveMutations: false,
 		});
+	});
+});
+
+describe("loadOpenCodeFileConfig", () => {
+	let tmpDir: string;
+	let packageJsonPath: string;
+	let projectConfigPath: string;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "bq-oc-config-"));
+		packageJsonPath = path.join(tmpDir, "package.json");
+		projectConfigPath = path.join(tmpDir, ".opencode", "batched-queue.json");
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it("loads executor model from package.json opencode.batchQueue", () => {
+		fs.writeFileSync(packageJsonPath, JSON.stringify({
+			opencode: {
+				batchQueue: {
+					executorModel: "openai/gpt-5.4-nano",
+				},
+			},
+		}));
+
+		const config = loadOpenCodeFileConfig({
+			cwd: tmpDir,
+			packageJsonPath,
+			projectConfigPath,
+		});
+
+		expect(config.executorModel).toEqual({
+			provider: "openai",
+			id: "gpt-5.4-nano",
+		});
+	});
+
+	it("lets project config override package defaults", () => {
+		fs.mkdirSync(path.dirname(projectConfigPath), { recursive: true });
+		fs.writeFileSync(packageJsonPath, JSON.stringify({
+			opencode: {
+				batchQueue: {
+					maxBatchActions: 3,
+				},
+			},
+		}));
+		fs.writeFileSync(projectConfigPath, JSON.stringify({
+			maxBatchActions: 9,
+		}));
+
+		const config = loadOpenCodeFileConfig({
+			cwd: tmpDir,
+			packageJsonPath,
+			projectConfigPath,
+		});
+
+		expect(config.maxBatchActions).toBe(9);
 	});
 });
 
