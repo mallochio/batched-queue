@@ -1,4 +1,6 @@
-import { complete } from "@earendil-works/pi-ai/compat";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Api, Message, Model, Tool, ToolCall } from "@earendil-works/pi-ai";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
@@ -9,6 +11,74 @@ import { parseActionBatchPayload } from "./guards.js";
 
 /** @deprecated Pass ModelRegistry directly to analyzeBatchObjective. */
 export type BatchAnalyzerContext = ModelRegistry;
+
+interface CompleteResponse {
+	readonly stopReason?: string;
+	readonly errorMessage?: string;
+	readonly content: ({ type: string } | ToolCall)[];
+}
+
+type CompleteImplementation = (
+	model: Model<Api>,
+	context: {
+		readonly systemPrompt: string;
+		readonly messages: readonly Message[];
+		readonly tools: readonly Tool[];
+	},
+	options: {
+		readonly apiKey?: string;
+		readonly headers?: Record<string, string>;
+		readonly signal?: AbortSignal;
+		readonly toolChoice?: string;
+	},
+) => Promise<CompleteResponse>;
+
+const require = createRequire(import.meta.url);
+let completeImplementationPromise: Promise<CompleteImplementation> | undefined;
+
+function isCompleteModule(value: unknown): value is { complete: CompleteImplementation } {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		"complete" in value &&
+		typeof (value as { complete: unknown }).complete === "function"
+	);
+}
+
+async function importCompatCompleteFromDist(): Promise<CompleteImplementation> {
+	const piAiEntrypointUrl = await resolvePiAiEntrypointUrl();
+	const compatUrl = pathToFileURL(
+		join(dirname(fileURLToPath(piAiEntrypointUrl)), "compat.js"),
+	).href;
+	const compatModule = await import(compatUrl);
+	if (!isCompleteModule(compatModule)) {
+		throw new Error("@earendil-works/pi-ai compat module does not export complete()");
+	}
+	return compatModule.complete;
+}
+
+async function resolvePiAiEntrypointUrl(): Promise<string> {
+	if (typeof import.meta.resolve === "function") {
+		return import.meta.resolve("@earendil-works/pi-ai");
+	}
+	return pathToFileURL(require.resolve("@earendil-works/pi-ai")).href;
+}
+
+export async function resolveCompleteImplementation(): Promise<CompleteImplementation> {
+	completeImplementationPromise ??= (async () => {
+		const piAiModule = await import(await resolvePiAiEntrypointUrl());
+		if (isCompleteModule(piAiModule)) {
+			return piAiModule.complete;
+		}
+
+		// Pi 0.80 moved complete() to a compat entrypoint, but some Pi loaders
+		// misresolve static subpath imports from TypeScript extensions. Import the
+		// sibling dist file by absolute URL so both old root exports and newer
+		// compat-only packages load reliably.
+		return importCompatCompleteFromDist();
+	})();
+	return completeImplementationPromise;
+}
 
 function analyzerSystemPrompt(config: ResolvedBatchQueueConfig): string {
 	const mutationGuidance = config.allowObjectiveMutations
@@ -111,6 +181,7 @@ export async function analyzeBatchObjective(
 		timestamp: Date.now(),
 	};
 
+	const complete = await resolveCompleteImplementation();
 	const response = await complete(
 		executorModel,
 		{
