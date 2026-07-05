@@ -9,8 +9,8 @@ import {
 	discoverAndLoadExtensions,
 	type ExtensionContext,
 	type RegisteredTool,
-} from "@mariozechner/pi-coding-agent";
-import type { Model } from "@mariozechner/pi-ai";
+} from "@earendil-works/pi-coding-agent";
+import type { Model } from "@earendil-works/pi-ai";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -39,6 +39,21 @@ for (const ext of loadResult.extensions) {
 
 if (!registeredTool) {
 	console.error("batch_queue not registered");
+	process.exit(1);
+}
+
+if (registeredTool.definition.executionMode !== "sequential") {
+	console.error("batch_queue should execute sequentially");
+	process.exit(1);
+}
+
+if (!registeredTool.definition.promptSnippet?.includes("Batch")) {
+	console.error("batch_queue promptSnippet missing");
+	process.exit(1);
+}
+
+if (!registeredTool.definition.promptGuidelines?.some((line) => line.includes("batch_queue"))) {
+	console.error("batch_queue promptGuidelines missing");
 	process.exit(1);
 }
 

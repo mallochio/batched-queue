@@ -1,5 +1,6 @@
-import { complete, type Api, type Message, type Model, type Tool, type ToolCall } from "@mariozechner/pi-ai";
-import type { ModelRegistry } from "@mariozechner/pi-coding-agent";
+import { complete } from "@earendil-works/pi-ai/compat";
+import type { Api, Message, Model, Tool, ToolCall } from "@earendil-works/pi-ai";
+import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import type { ActionBatchPayload } from "./payload.js";
 import type { ResolvedBatchQueueConfig } from "./config.js";
@@ -9,26 +10,39 @@ import { parseActionBatchPayload } from "./guards.js";
 /** @deprecated Pass ModelRegistry directly to analyzeBatchObjective. */
 export type BatchAnalyzerContext = ModelRegistry;
 
-const ANALYZER_SYSTEM_PROMPT = [
-	"You are the batch executor for a coding agent.",
-	"Given an objective, emit a sequential action batch as JSON via the submit_action_batch tool.",
-	"Plan 2-5 low-risk sequential repo actions for inspect/search/check loops whenever possible.",
-	"Use deterministic actions: read/grep before shell, shell before mutation, and mutate only when the objective clearly requires it.",
-	"Do not plan destructive, long-running, interactive, or approval-sensitive commands.",
-	"Available action types:",
-	"- read_lines: { type, path, startLine?, endLine? }",
-	"- grep_pattern: { type, pattern, path?, glob?, caseSensitive?, literal?, contextLines? }",
-	"- execute_bash: { type, command, timeoutMs? }",
-	"- apply_diff: { type, path, oldText, newText, replaceAll? }",
-	"Order actions so each step can rely on prior shell state (cwd/env persist for execute_bash).",
-	"Keep batches concise and actionable; stop once enough context or verification is gathered.",
-].join("\n");
+function analyzerSystemPrompt(config: ResolvedBatchQueueConfig): string {
+	const mutationGuidance = config.allowObjectiveMutations
+		? [
+			"Mutate only when the objective clearly requires it.",
+			"- apply_diff: { type, path, oldText, newText, replaceAll? }",
+		]
+		: [
+			"Do not plan mutating actions. Objective mode is read/check-only; omit apply_diff.",
+		];
 
-function buildSubmitBatchTool(maxBatchActions: number): Tool {
+	return [
+		"You are the batch executor for a coding agent.",
+		"Given an objective, emit a sequential action batch as JSON via the submit_action_batch tool.",
+		"Plan 2-5 low-risk sequential repo actions for inspect/search/check loops whenever possible.",
+		"Use deterministic actions: read/grep before shell.",
+		...mutationGuidance,
+		"Do not plan destructive, long-running, interactive, or approval-sensitive commands.",
+		"Available action types:",
+		"- read_lines: { type, path, startLine?, endLine? }",
+		"- grep_pattern: { type, pattern, path?, glob?, caseSensitive?, literal?, contextLines? }",
+		"- execute_bash: { type, command, timeoutMs? }",
+		"Order actions so each step can rely on prior shell state (cwd/env persist for execute_bash).",
+		"Keep batches concise and actionable; stop once enough context or verification is gathered.",
+	].join("\n");
+}
+
+function buildSubmitBatchTool(config: ResolvedBatchQueueConfig): Tool {
 	return {
 		name: "submit_action_batch",
 		description: "Submit the planned sequential action batch for execution.",
-		parameters: createSubmitActionBatchToolSchema(maxBatchActions),
+		parameters: createSubmitActionBatchToolSchema(config.maxBatchActions, {
+			allowMutatingActions: config.allowObjectiveMutations,
+		}),
 	};
 }
 
@@ -47,6 +61,20 @@ function extractBatchFromResponse(
 	}
 
 	return parseActionBatchPayload(toolCall.arguments, maxBatchActions);
+}
+
+function assertObjectiveMutationPolicy(
+	payload: ActionBatchPayload,
+	config: ResolvedBatchQueueConfig,
+): void {
+	if (config.allowObjectiveMutations) {
+		return;
+	}
+
+	const mutation = payload.actions.find((action) => action.type === "apply_diff");
+	if (mutation) {
+		throw new Error("objective-planned apply_diff is disabled; pass explicit actions or enable allowObjectiveMutations");
+	}
 }
 
 /**
@@ -86,9 +114,9 @@ export async function analyzeBatchObjective(
 	const response = await complete(
 		executorModel,
 		{
-			systemPrompt: ANALYZER_SYSTEM_PROMPT,
+			systemPrompt: analyzerSystemPrompt(config),
 			messages: [userMessage],
-			tools: [buildSubmitBatchTool(config.maxBatchActions)],
+			tools: [buildSubmitBatchTool(config)],
 		},
 		{ apiKey: auth.apiKey, headers: auth.headers, signal, toolChoice: "any" },
 	);
@@ -100,7 +128,9 @@ export async function analyzeBatchObjective(
 		throw new Error(response.errorMessage ?? "executor model request failed");
 	}
 
-	return extractBatchFromResponse(response, config.maxBatchActions);
+	const payload = extractBatchFromResponse(response, config.maxBatchActions);
+	assertObjectiveMutationPolicy(payload, config);
+	return payload;
 }
 
 export function createBatchQueueToolParameters(maxBatchActions: number) {

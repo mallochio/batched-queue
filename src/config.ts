@@ -28,6 +28,12 @@ export interface BatchQueueConfig {
 	 * The driver model is always the main model selected in Pi (ctx.model).
 	 */
 	executorModel?: ModelRef;
+	/**
+	 * Whether objective-planned batches may include mutating actions such as
+	 * apply_diff. Direct `actions` batches are always allowed to include them.
+	 * Default: false.
+	 */
+	allowObjectiveMutations?: boolean;
 	/** Path security overrides (merged with DEFAULT_PATH_SECURITY). */
 	pathSecurity?: Partial<PathSecurityConfig>;
 }
@@ -39,6 +45,7 @@ export interface ResolvedBatchQueueConfig {
 	 * When unset, the Pi session driver model (ctx.model) is used.
 	 */
 	readonly executorModel?: ModelRef;
+	readonly allowObjectiveMutations: boolean;
 	readonly pathSecurity: PathSecurityConfig;
 }
 
@@ -46,6 +53,7 @@ const ENV_MAX_ACTIONS = "BATCH_QUEUE_MAX_ACTIONS";
 const ENV_EXECUTOR = "BATCH_QUEUE_EXECUTOR";
 const ENV_EXECUTOR_PROVIDER = "BATCH_QUEUE_EXECUTOR_PROVIDER";
 const ENV_EXECUTOR_MODEL = "BATCH_QUEUE_EXECUTOR_MODEL";
+const ENV_ALLOW_OBJECTIVE_MUTATIONS = "BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS";
 
 function parsePositiveInt(value: string | undefined): number | undefined {
 	if (!value) return undefined;
@@ -75,6 +83,14 @@ function parseExecutorFromEnv(): ModelRef | undefined {
 	return undefined;
 }
 
+function parseBooleanEnv(value: string | undefined): boolean | undefined {
+	if (!value) return undefined;
+	const normalized = value.trim().toLowerCase();
+	if (["1", "true", "yes", "on"].includes(normalized)) return true;
+	if (["0", "false", "no", "off"].includes(normalized)) return false;
+	return undefined;
+}
+
 export function resolveBatchQueueConfig(
 	overrides: BatchQueueConfig = {},
 	fileConfig: BatchQueueConfig = {},
@@ -93,6 +109,11 @@ export function resolveBatchQueueConfig(
 	return {
 		maxBatchActions,
 		...(executorModel ? { executorModel } : {}),
+		allowObjectiveMutations:
+			overrides.allowObjectiveMutations ??
+			parseBooleanEnv(process.env[ENV_ALLOW_OBJECTIVE_MUTATIONS]) ??
+			fileConfig.allowObjectiveMutations ??
+			false,
 		pathSecurity: {
 			...DEFAULT_PATH_SECURITY,
 			...fileConfig.pathSecurity,

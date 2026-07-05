@@ -4,7 +4,7 @@
  * run: bun run smoke-test.ts
  */
 
-import { discoverAndLoadExtensions } from "@mariozechner/pi-coding-agent";
+import { discoverAndLoadExtensions } from "@earendil-works/pi-coding-agent";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 

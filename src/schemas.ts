@@ -55,6 +55,12 @@ export const QueueActionSchema = Type.Union([
 	ApplyDiffActionSchema,
 ]);
 
+const ObjectiveQueueActionSchema = Type.Union([
+	ReadLinesActionSchema,
+	GrepPatternActionSchema,
+	ExecuteBashActionSchema,
+]);
+
 export type QueueActionFromSchema = Static<typeof QueueActionSchema>;
 /** @deprecated Alias for QueueActionFromSchema. */
 export type QueueActionSchemaType = QueueActionFromSchema;
@@ -237,9 +243,12 @@ export const ActionTypeSchema = Type.Union(
 	ACTION_TYPES.map((type) => Type.Literal(type)),
 );
 
-export function createSubmitActionBatchToolSchema(maxBatchActions: number) {
+export function createSubmitActionBatchToolSchema(
+	maxBatchActions: number,
+	options: { allowMutatingActions?: boolean } = {},
+) {
 	return Type.Object({
-		actions: Type.Array(QueueActionSchema, {
+		actions: Type.Array(options.allowMutatingActions ? QueueActionSchema : ObjectiveQueueActionSchema, {
 			minItems: MIN_BATCH_ACTIONS,
 			maxItems: maxBatchActions,
 		}),

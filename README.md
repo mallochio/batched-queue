@@ -21,7 +21,7 @@ batched-queue/
 
 ## Requirements
 
-- [Pi coding agent](https://www.npmjs.com/package/@mariozechner/pi-coding-agent) on your `PATH`
+- [Pi coding agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) on your `PATH`
 - [Bun](https://bun.sh) preferred, or Node/npm for dependency install
 - `bash` and `rg` on `PATH`
 
@@ -78,7 +78,8 @@ Project-local config in `.pi/batched-queue.json`:
 ```json
 {
   "executorModel": "openai/gpt-5.4-nano",
-  "maxBatchActions": 5
+  "maxBatchActions": 5,
+  "allowObjectiveMutations": false
 }
 ```
 
@@ -90,7 +91,8 @@ Package defaults can live in `package.json`:
 {
   "pi": {
     "batchQueue": {
-      "executorModel": "openai/gpt-5.4-nano"
+      "executorModel": "openai/gpt-5.4-nano",
+      "allowObjectiveMutations": false
     }
   }
 }
@@ -106,8 +108,9 @@ Optional environment variables:
 - `BATCH_QUEUE_EXECUTOR`: executor model as `provider/model`
 - `BATCH_QUEUE_EXECUTOR_PROVIDER`: executor provider when set separately
 - `BATCH_QUEUE_EXECUTOR_MODEL`: executor model id when set separately
+- `BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS`: set to `true` to let objective-planned batches include `apply_diff`
 
-The driver model is your main Pi session model. The executor model plans batches when you pass an `objective`. By default it uses the same session model.
+The driver model is your main Pi session model. The executor model plans batches when you pass an `objective`. By default it uses the same session model. Objective-planned batches are read/check-only by default; use explicit `actions` for edits, or set `allowObjectiveMutations` if you intentionally want the executor planner to emit `apply_diff`.
 
 Example:
 
@@ -122,7 +125,7 @@ Or configure in `.pi/batched-queue.json` and skip the env var.
 
 The `batch_queue` tool accepts either:
 
-- `objective`: an executor model plans the action batch
+- `objective`: an executor model plans a read/check action batch
 - `actions`: a pre-planned batch supplied directly by the driver model
 
 For coding sessions, prefer `batch_queue` for small sequential inspect/search/check loops instead of making multiple individual tool calls.
@@ -135,7 +138,7 @@ Use it when you need 2-5 low-risk sequential repo actions:
 - apply a targeted diff
 - verify a local change
 
-Use `actions` when you already know the exact deterministic steps. Use `objective` when a cheaper executor model should plan the steps.
+Use `actions` when you already know the exact deterministic steps, especially for `apply_diff`. Use `objective` when a cheaper executor model should plan safe read/search/check steps.
 
 Prefer `multi_tool_use.parallel` instead for independent parallel reads/searches. Do not use `batch_queue` for destructive, long-running, interactive, or approval-sensitive commands. File actions are workspace-scoped unless configured otherwise.
 

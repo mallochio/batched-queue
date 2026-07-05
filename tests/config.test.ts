@@ -31,6 +31,12 @@ describe("parseBatchQueueJsonConfig", () => {
 		});
 	});
 
+	it("parses allowObjectiveMutations", () => {
+		expect(parseBatchQueueJsonConfig({ allowObjectiveMutations: true })).toEqual({
+			allowObjectiveMutations: true,
+		});
+	});
+
 	it("ignores invalid values", () => {
 		expect(parseBatchQueueJsonConfig({
 			maxBatchActions: "nope",
@@ -82,12 +88,14 @@ describe("loadFileConfig", () => {
 				batchQueue: {
 					executorModel: "openai/gpt-5.4-nano",
 					maxBatchActions: 3,
+					allowObjectiveMutations: true,
 				},
 			},
 		}));
 		fs.writeFileSync(projectConfigPath, JSON.stringify({
 			executorModel: "openai/gpt-5.4-mini",
 			maxBatchActions: 7,
+			allowObjectiveMutations: false,
 		}));
 
 		const config = loadFileConfig({
@@ -99,18 +107,25 @@ describe("loadFileConfig", () => {
 		expect(config).toEqual({
 			executorModel: { provider: "openai", id: "gpt-5.4-mini" },
 			maxBatchActions: 7,
+			allowObjectiveMutations: false,
 		});
 	});
 });
 
 describe("resolveBatchQueueConfig precedence", () => {
 	const savedExecutor = process.env.BATCH_QUEUE_EXECUTOR;
+	const savedAllowObjectiveMutations = process.env.BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS;
 
 	afterEach(() => {
 		if (savedExecutor === undefined) {
 			delete process.env.BATCH_QUEUE_EXECUTOR;
 		} else {
 			process.env.BATCH_QUEUE_EXECUTOR = savedExecutor;
+		}
+		if (savedAllowObjectiveMutations === undefined) {
+			delete process.env.BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS;
+		} else {
+			process.env.BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS = savedAllowObjectiveMutations;
 		}
 	});
 
@@ -147,5 +162,19 @@ describe("resolveBatchQueueConfig precedence", () => {
 			provider: "openai",
 			id: "gpt-5.4-mini",
 		});
+	});
+
+	it("disables objective mutations by default", () => {
+		delete process.env.BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS;
+		const resolved = resolveBatchQueueConfig();
+		expect(resolved.allowObjectiveMutations).toBe(false);
+	});
+
+	it("prefers env objective mutation flag over file config", () => {
+		process.env.BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS = "true";
+		const resolved = resolveBatchQueueConfig({}, {
+			allowObjectiveMutations: false,
+		});
+		expect(resolved.allowObjectiveMutations).toBe(true);
 	});
 });

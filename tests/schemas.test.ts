@@ -21,6 +21,7 @@ import {
 import {
 	createActionBatchPayloadSchema,
 	createBatchExecutionResultSchema,
+	createSubmitActionBatchToolSchema,
 } from "../src/schemas.js";
 
 describe("ActionBatchPayload validation", () => {
@@ -89,6 +90,40 @@ describe("ActionBatchPayload validation", () => {
 				extra: true,
 			}),
 		).toBe(false);
+	});
+});
+
+describe("objective planner schema", () => {
+	it("rejects apply_diff when objective mutations are disabled", () => {
+		const schema = createSubmitActionBatchToolSchema(5);
+
+		expect(Value.Check(schema, {
+			actions: [
+				{
+					type: "apply_diff",
+					path: "src/index.ts",
+					oldText: "foo",
+					newText: "bar",
+				},
+			],
+		})).toBe(false);
+	});
+
+	it("allows apply_diff when objective mutations are enabled", () => {
+		const schema = createSubmitActionBatchToolSchema(5, {
+			allowMutatingActions: true,
+		});
+
+		expect(Value.Check(schema, {
+			actions: [
+				{
+					type: "apply_diff",
+					path: "src/index.ts",
+					oldText: "foo",
+					newText: "bar",
+				},
+			],
+		})).toBe(true);
 	});
 });
 

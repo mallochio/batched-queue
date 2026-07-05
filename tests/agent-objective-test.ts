@@ -11,8 +11,8 @@ import {
 	type ExtensionContext,
 	type RegisteredTool,
 	ModelRegistry,
-} from "@mariozechner/pi-coding-agent";
-import type { Model } from "@mariozechner/pi-ai";
+} from "@earendil-works/pi-coding-agent";
+import type { Model } from "@earendil-works/pi-ai";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
