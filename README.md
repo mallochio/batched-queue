@@ -47,7 +47,13 @@ Pi stores the package under `packages` in settings, so you do not need a separat
 
 ## OpenCode install
 
-Add one line to `~/.config/opencode/opencode.json` (or project `opencode.json`):
+Use OpenCode's plugin installer:
+
+```bash
+opencode plugin "batched-queue@git+https://github.com/mallochio/batched-queue.git" -g
+```
+
+Or add the same package spec to `~/.config/opencode/opencode.json` (or project `opencode.json`):
 
 ```json
 {
@@ -58,7 +64,7 @@ Add one line to `~/.config/opencode/opencode.json` (or project `opencode.json`):
 }
 ```
 
-Restart OpenCode. See [.opencode/INSTALL.md](.opencode/INSTALL.md) for local dev, config, and troubleshooting.
+Restart OpenCode. Do not use the bare GitHub URL (`https://github.com/mallochio/batched-queue`) as a plugin entry. See [.opencode/INSTALL.md](.opencode/INSTALL.md) for local dev, config, and troubleshooting.
 
 Or use the helper script:
 

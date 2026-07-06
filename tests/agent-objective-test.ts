@@ -14,13 +14,14 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const extensionDir = path.dirname(fileURLToPath(import.meta.url));
 const extensionPath = path.join(extensionDir, "..", "src", "extension.ts");
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "bq-agent-"));
+const tmpParent = path.join(extensionDir, ".tmp");
+fs.mkdirSync(tmpParent, { recursive: true });
+const tmpDir = fs.mkdtempSync(path.join(tmpParent, "bq-agent-"));
 fs.writeFileSync(path.join(tmpDir, "sample.txt"), "alpha\nbeta\ngamma\n");
 
 const executorModelId = process.env.BATCH_QUEUE_EXECUTOR ?? "openai/gpt-5.4-nano";
@@ -28,7 +29,7 @@ const slash = executorModelId.indexOf("/");
 const executorProvider = slash === -1 ? "openai" : executorModelId.slice(0, slash);
 const executorId = slash === -1 ? executorModelId : executorModelId.slice(slash + 1);
 
-const authStorage = AuthStorage.create(path.join(os.tmpdir(), "bq-agent-auth"));
+const authStorage = AuthStorage.create(path.join(tmpParent, "bq-agent-auth"));
 const modelRegistry = ModelRegistry.inMemory(authStorage);
 
 const driverModel = modelRegistry.find(executorProvider, executorId);

@@ -6,18 +6,22 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { BatchQueueRunner } from "../src/queue-runner";
 import { PersistentShell } from "../src/persistent-shell";
 import { BASH_TIMEOUT_EXIT_CODE } from "../src/constants";
+
+const tmpParent = path.join(path.dirname(fileURLToPath(import.meta.url)), ".tmp");
+const realPath = (target: string) => fs.realpathSync(target);
 
 describe("PersistentShell", () => {
 	let shell: PersistentShell;
 	let tmpDir: string;
 
 	beforeEach(async () => {
-		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "bq-shell-"));
+		fs.mkdirSync(tmpParent, { recursive: true });
+		tmpDir = fs.mkdtempSync(path.join(tmpParent, "bq-shell-"));
 		shell = new PersistentShell({ initialCwd: tmpDir });
 		await shell.waitUntilReady();
 	});
@@ -33,11 +37,11 @@ describe("PersistentShell", () => {
 
 		const cdResult = await shell.execute(`cd ${subDir}`);
 		expect(cdResult.exitCode).toBe(0);
-		expect(cdResult.cwd).toBe(subDir);
+		expect(realPath(cdResult.cwd)).toBe(realPath(subDir));
 
 		const pwdResult = await shell.execute("pwd -P");
 		expect(pwdResult.exitCode).toBe(0);
-		expect(pwdResult.stdout.trim()).toBe(subDir);
+		expect(realPath(pwdResult.stdout.trim())).toBe(realPath(subDir));
 	});
 
 	it("persists exported environment variables", async () => {
@@ -58,7 +62,8 @@ describe("BatchQueueRunner", () => {
 	let tmpDir: string;
 
 	beforeEach(() => {
-		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "bq-runner-"));
+		fs.mkdirSync(tmpParent, { recursive: true });
+		tmpDir = fs.mkdtempSync(path.join(tmpParent, "bq-runner-"));
 		runner = new BatchQueueRunner("test-session", tmpDir);
 	});
 
@@ -146,9 +151,9 @@ describe("BatchQueueRunner", () => {
 		const pwdResult = result.results[1];
 		expect(pwdResult.type).toBe("execute_bash");
 		if (pwdResult.type === "execute_bash") {
-			expect(pwdResult.stdout.text.trim()).toBe(nested);
+			expect(realPath(pwdResult.stdout.text.trim())).toBe(realPath(nested));
 		}
-		expect(result.shellState.cwd).toBe(nested);
+		expect(realPath(result.shellState.cwd)).toBe(realPath(nested));
 	});
 
 	it("fast-fails when read_lines target is missing", async () => {
@@ -237,8 +242,8 @@ describe("BatchQueueRunner", () => {
 		const pwdResult = result.results[0];
 		expect(pwdResult.type).toBe("execute_bash");
 		if (pwdResult.type === "execute_bash") {
-			expect(pwdResult.stdout.text.trim()).toBe(nested);
+			expect(realPath(pwdResult.stdout.text.trim())).toBe(realPath(nested));
 		}
-		expect(result.shellState.cwd).toBe(nested);
+		expect(realPath(result.shellState.cwd)).toBe(realPath(nested));
 	});
 });

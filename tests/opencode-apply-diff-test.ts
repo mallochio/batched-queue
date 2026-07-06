@@ -8,10 +8,12 @@ import type { ToolContext } from "@opencode-ai/plugin";
 import { createBatchedQueuePluginHooks } from "../src/opencode/plugin.ts";
 import { DEFAULT_PATH_SECURITY } from "../src/lib/path-security.ts";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "bq-oc-diff-"));
+const tmpParent = path.join(path.dirname(fileURLToPath(import.meta.url)), ".tmp");
+fs.mkdirSync(tmpParent, { recursive: true });
+const tmpDir = fs.mkdtempSync(path.join(tmpParent, "bq-oc-diff-"));
 const targetPath = path.join(tmpDir, "hello.txt");
 fs.writeFileSync(targetPath, "hello\n");
 
@@ -69,6 +71,13 @@ if (!updated.includes("hello world")) {
 	console.error("file was not updated:", updated);
 	process.exit(1);
 }
+
+await hooks.event?.({
+	event: {
+		type: "session.deleted",
+		properties: { info: { id: "opencode-apply-diff-test" } },
+	},
+} as never);
 
 console.log("OK: OpenCode explicit apply_diff with allowObjectiveMutations=false");
 console.log(updated.trim());

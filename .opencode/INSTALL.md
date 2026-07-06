@@ -8,7 +8,13 @@
 
 ## One-line install
 
-Add to `~/.config/opencode/opencode.json` (global) or project `opencode.json`:
+Use OpenCode's plugin installer:
+
+```bash
+opencode plugin "batched-queue@git+https://github.com/mallochio/batched-queue.git" -g
+```
+
+Or add the same package spec to `~/.config/opencode/opencode.json` (global) or project `opencode.json`:
 
 ```json
 {
@@ -19,7 +25,7 @@ Add to `~/.config/opencode/opencode.json` (global) or project `opencode.json`:
 }
 ```
 
-Restart OpenCode. The plugin installs automatically via Bun at startup.
+Do not use the bare GitHub URL (`https://github.com/mallochio/batched-queue`) as a plugin entry. Restart OpenCode after install or config changes. The plugin installs automatically via Bun at startup.
 
 Pin a release tag for stability:
 
@@ -104,8 +110,15 @@ Then in `opencode.json`:
 ### Plugin not loading
 
 1. Check logs: `opencode run --print-logs "hello" 2>&1 | grep -i batch`
-2. Confirm the `plugin` entry in `opencode.json`
-3. Restart OpenCode after config changes
+2. Confirm the `plugin` entry in `opencode.json` uses an npm package spec, not a bare GitHub URL
+3. Remove duplicate `batched-queue` entries from global and project configs
+4. Restart OpenCode after config changes
+
+If a git-package install still fails, use the local-plugin fallback: install this package under `~/.config/opencode` and add `~/.config/opencode/plugins/batched-queue.ts` containing:
+
+```ts
+export { BatchedQueuePlugin } from "batched-queue/src/opencode/plugin.ts";
+```
 
 ### Objective mode errors
 

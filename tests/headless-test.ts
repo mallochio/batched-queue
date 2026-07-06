@@ -12,13 +12,14 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { Model } from "@earendil-works/pi-ai";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const extensionDir = path.dirname(fileURLToPath(import.meta.url));
 const extensionPath = path.join(extensionDir, "..", "src", "extension.ts");
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "bq-headless-"));
+const tmpParent = path.join(extensionDir, ".tmp");
+fs.mkdirSync(tmpParent, { recursive: true });
+const tmpDir = fs.mkdtempSync(path.join(tmpParent, "bq-headless-"));
 fs.writeFileSync(path.join(tmpDir, "hello.txt"), "hello world\n");
 
 const loadResult = await discoverAndLoadExtensions([extensionPath], tmpDir);

@@ -9,10 +9,12 @@ import type { ToolContext } from "@opencode-ai/plugin";
 import { createBatchedQueuePluginHooks } from "../src/opencode/plugin.ts";
 import { DEFAULT_PATH_SECURITY } from "../src/lib/path-security.ts";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "bq-oc-headless-"));
+const tmpParent = path.join(path.dirname(fileURLToPath(import.meta.url)), ".tmp");
+fs.mkdirSync(tmpParent, { recursive: true });
+const tmpDir = fs.mkdtempSync(path.join(tmpParent, "bq-oc-headless-"));
 fs.writeFileSync(path.join(tmpDir, "hello.txt"), "hello world\n");
 
 const hooks = createBatchedQueuePluginHooks(
@@ -69,6 +71,13 @@ if (!result.includes("batch completed successfully") || !result.includes("next s
 	console.error("Unexpected batch result:\n", result);
 	process.exit(1);
 }
+
+await hooks.event?.({
+	event: {
+		type: "session.deleted",
+		properties: { info: { id: "opencode-headless-test" } },
+	},
+} as never);
 
 console.log("OK: headless batch_queue execution via OpenCode plugin");
 console.log(result.split("\n").slice(0, 4).join("\n"));
