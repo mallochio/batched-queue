@@ -157,6 +157,14 @@ export function registerBatchedQueueExtension(
 				};
 			}
 
+			if (!executeResult.result) {
+				return {
+					content: [{ type: "text", text: executeResult.text }],
+					details: { error: "missing batch result" } satisfies BatchQueueToolErrorDetails,
+					isError: true,
+				};
+			}
+
 			const executorModel = resolveExecutorRef(driverModel, resolvedConfig);
 
 			return {
@@ -168,7 +176,7 @@ export function registerBatchedQueueExtension(
 					},
 					executorModel,
 					maxBatchActions: resolvedConfig.maxBatchActions,
-					result: executeResult.result!,
+					result: executeResult.result,
 				} satisfies BatchQueueToolDetails,
 				isError: executeResult.isError,
 			};

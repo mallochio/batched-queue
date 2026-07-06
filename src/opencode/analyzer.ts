@@ -14,13 +14,28 @@ interface StructuredPromptInfo {
 	readonly error?: { readonly name?: string; readonly message?: string };
 }
 
+interface ExecutorPromptBody {
+	readonly model: { readonly providerID: string; readonly modelID: string };
+	readonly parts: Array<{ readonly type: "text"; readonly text: string }>;
+	readonly format?: {
+		readonly type: "json_schema";
+		readonly schema: Record<string, unknown>;
+	};
+}
+
+type PromptBody = NonNullable<Parameters<OpenCodeClient["session"]["prompt"]>[0]["body"]>;
+
+function asPromptBody(body: ExecutorPromptBody): PromptBody {
+	return body as PromptBody;
+}
+
 function requireExecutorModel(config: ResolvedBatchQueueConfig): {
 	readonly provider: string;
 	readonly id: string;
 } {
 	if (!config.executorModel) {
 		throw new Error(
-			"batch_queue objective mode requires executorModel in config (.opencode/batched-queue.json, opencode.batchQueue in package.json, or BATCH_QUEUE_EXECUTOR)",
+			"batch_queue objective mode requires executorModel in config or BATCH_QUEUE_EXECUTOR",
 		);
 	}
 	return config.executorModel;
@@ -52,6 +67,16 @@ function extractStructuredOutput(result: PromptResult): unknown {
 	}
 
 	return undefined;
+}
+
+function isStructuredFormatError(error: unknown): boolean {
+	if (!(error instanceof Error)) {
+		return false;
+	}
+	const message = error.message.toLowerCase();
+	return message.includes("outputformatjsonschema")
+		|| message.includes("json_schema")
+		|| message.includes("structured");
 }
 
 async function createPlanningSession(client: OpenCodeClient): Promise<string> {
@@ -86,6 +111,16 @@ function buildObjectivePrompt(objective: string, config: ResolvedBatchQueueConfi
 	].join("\n");
 }
 
+function toPlainJsonSchema(config: ResolvedBatchQueueConfig): Record<string, unknown> {
+	return JSON.parse(
+		JSON.stringify(
+			createSubmitActionBatchToolSchema(config.maxBatchActions, {
+				allowMutatingActions: config.allowObjectiveMutations,
+			}),
+		),
+	) as Record<string, unknown>;
+}
+
 async function promptExecutor(
 	client: OpenCodeClient,
 	sessionID: string,
@@ -93,48 +128,41 @@ async function promptExecutor(
 	config: ResolvedBatchQueueConfig,
 	objective: string,
 ): Promise<PromptResult> {
-	const schema = JSON.parse(
-		JSON.stringify(
-			createSubmitActionBatchToolSchema(config.maxBatchActions, {
-				allowMutatingActions: config.allowObjectiveMutations,
-			}),
-		),
-	) as Record<string, unknown>;
-
-	const model = {
-		providerID: executorModel.provider,
-		modelID: executorModel.id,
+	const bodyBase: ExecutorPromptBody = {
+		model: {
+			providerID: executorModel.provider,
+			modelID: executorModel.id,
+		},
+		parts: [{ type: "text", text: buildObjectivePrompt(objective, config) }],
 	};
-	const parts = [{ type: "text" as const, text: buildObjectivePrompt(objective, config) }];
 
 	try {
 		return await client.session.prompt({
 			path: { id: sessionID },
-			body: {
-				model,
-				parts,
+			body: asPromptBody({
+				...bodyBase,
 				format: {
 					type: "json_schema",
-					schema,
+					schema: toPlainJsonSchema(config),
 				},
-			} as never,
+			}),
 		});
-	} catch {
+	} catch (error) {
+		if (!isStructuredFormatError(error)) {
+			throw error;
+		}
 		return client.session.prompt({
 			path: { id: sessionID },
-			body: {
-				model,
-				parts,
-			},
+			body: asPromptBody(bodyBase),
 		});
 	}
 }
 
 export async function analyzeOpenCodeBatchObjective(
 	client: OpenCodeClient,
-	_sessionID: string,
 	objective: string,
 	config: ResolvedBatchQueueConfig,
+	_signal?: AbortSignal,
 ): Promise<ActionBatchPayload> {
 	const executorModel = requireExecutorModel(config);
 	const planningSessionID = await createPlanningSession(client);

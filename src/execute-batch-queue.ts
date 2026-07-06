@@ -79,7 +79,7 @@ export async function executeBatchQueue(options: {
 		} else if (params.objective?.trim()) {
 			if (!deps.resolveObjective) {
 				return {
-					text: "batch_queue objective mode requires an executor model in config (set executorModel in .opencode/batched-queue.json or BATCH_QUEUE_EXECUTOR)",
+					text: "batch_queue objective mode requires executorModel in config or BATCH_QUEUE_EXECUTOR",
 					isError: true,
 					error: "missing objective resolver",
 				};

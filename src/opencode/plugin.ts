@@ -8,12 +8,11 @@ import {
 } from "../config.js";
 import {
 	createRunnerMap,
-	disposeAllRunners,
 	executeBatchQueue,
 } from "../execute-batch-queue.js";
+import { loadOpenCodeFileConfig } from "../file-config.js";
 import { buildBatchQueueDescription } from "../tool-description.js";
 import { analyzeOpenCodeBatchObjective } from "./analyzer.js";
-import { loadOpenCodeFileConfig } from "./file-config.js";
 import { createBatchQueueZodArgs } from "./schemas-zod.js";
 
 type OpenCodeClient = PluginInput["client"];
@@ -22,7 +21,7 @@ function openCodeExecutorDescription(config: ResolvedBatchQueueConfig): string {
 	if (config.executorModel) {
 		return `${config.executorModel.provider}/${config.executorModel.id} (configured executor model)`;
 	}
-	return "required for objective mode (.opencode/batched-queue.json, opencode.batchQueue, or BATCH_QUEUE_EXECUTOR)";
+	return "required for objective mode (executorModel in config or BATCH_QUEUE_EXECUTOR)";
 }
 
 function sessionIdFromDeletedEvent(event: Event): string | undefined {
@@ -62,15 +61,16 @@ export function createBatchedQueuePluginHooks(
 						config: resolvedConfig,
 						params: args,
 						runners,
+						signal: context.abort,
 						deps: {
 							getSessionId: () => context.sessionID,
 							getCwd: () => context.directory,
-							resolveObjective: (objective) =>
+							resolveObjective: (objective, signal) =>
 								analyzeOpenCodeBatchObjective(
 									client,
-									context.sessionID,
 									objective,
 									resolvedConfig,
+									signal,
 								),
 						},
 					});

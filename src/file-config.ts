@@ -10,6 +10,13 @@ const OPENCODE_PROJECT_CONFIG_RELATIVE = path.join(".opencode", "batched-queue.j
 export const PI_PROJECT_CONFIG_PATH = PI_PROJECT_CONFIG_RELATIVE;
 export const OPENCODE_PROJECT_CONFIG_PATH = OPENCODE_PROJECT_CONFIG_RELATIVE;
 
+export type ConfigTarget = "pi" | "opencode";
+
+const TARGET_SETTINGS: Record<ConfigTarget, { readonly section: "pi" | "opencode"; readonly projectConfigRelative: string }> = {
+	pi: { section: "pi", projectConfigRelative: PI_PROJECT_CONFIG_RELATIVE },
+	opencode: { section: "opencode", projectConfigRelative: OPENCODE_PROJECT_CONFIG_RELATIVE },
+};
+
 export interface BatchQueueJsonConfig {
 	readonly maxBatchActions?: number;
 	readonly executorModel?: string | ModelRef;
@@ -86,15 +93,8 @@ function readPackageJsonConfig(
 	return parseBatchQueueJsonConfig(raw[section].batchQueue);
 }
 
-function readPiPackageJsonConfig(packageJsonPath: string): BatchQueueConfig {
-	return readPackageJsonConfig(packageJsonPath, "pi");
-}
-
-function readOpenCodePackageJsonConfig(packageJsonPath: string): BatchQueueConfig {
-	return readPackageJsonConfig(packageJsonPath, "opencode");
-}
-
 export interface LoadFileConfigOptions {
+	readonly target?: ConfigTarget;
 	readonly cwd?: string;
 	readonly packageJsonPath?: string;
 	readonly projectConfigPath?: string;
@@ -109,46 +109,31 @@ export function defaultPackageJsonPath(): string {
  * Load batched-queue settings from JSON files.
  *
  * Precedence within file sources (later wins):
- * 1. package.json → pi.batchQueue (package defaults)
- * 2. .pi/batched-queue.json in cwd (project override)
+ * 1. package.json → {pi|opencode}.batchQueue (package defaults)
+ * 2. project config in cwd (.pi/ or .opencode/batched-queue.json)
  */
 export function loadFileConfig(options: LoadFileConfigOptions = {}): BatchQueueConfig {
+	const target = options.target ?? "pi";
+	const settings = TARGET_SETTINGS[target];
 	const cwd = options.cwd ?? process.cwd();
-	const packageConfig = readPiPackageJsonConfig(
+	const packageConfig = readPackageJsonConfig(
 		options.packageJsonPath ?? defaultPackageJsonPath(),
+		settings.section,
 	);
 	const projectConfig = readConfigFile(
-		options.projectConfigPath ?? path.join(cwd, PI_PROJECT_CONFIG_RELATIVE),
+		options.projectConfigPath ?? path.join(cwd, settings.projectConfigRelative),
 	);
 
 	return mergeFileConfigs(packageConfig, projectConfig);
 }
 
-export interface LoadOpenCodeFileConfigOptions {
-	readonly cwd?: string;
-	readonly packageJsonPath?: string;
-	readonly projectConfigPath?: string;
-}
+/** @deprecated Use loadFileConfig({ target: "opencode", ... }). */
+export type LoadOpenCodeFileConfigOptions = Omit<LoadFileConfigOptions, "target">;
 
-/**
- * Load batched-queue settings for OpenCode from JSON files.
- *
- * Precedence within file sources (later wins):
- * 1. package.json → opencode.batchQueue (package defaults)
- * 2. .opencode/batched-queue.json in cwd (project override)
- */
 export function loadOpenCodeFileConfig(
 	options: LoadOpenCodeFileConfigOptions = {},
 ): BatchQueueConfig {
-	const cwd = options.cwd ?? process.cwd();
-	const packageConfig = readOpenCodePackageJsonConfig(
-		options.packageJsonPath ?? defaultPackageJsonPath(),
-	);
-	const projectConfig = readConfigFile(
-		options.projectConfigPath ?? path.join(cwd, OPENCODE_PROJECT_CONFIG_RELATIVE),
-	);
-
-	return mergeFileConfigs(packageConfig, projectConfig);
+	return loadFileConfig({ ...options, target: "opencode" });
 }
 
 function mergeFileConfigs(

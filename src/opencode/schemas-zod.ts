@@ -32,25 +32,15 @@ const applyDiffActionSchema = tool.schema.object({
 	replaceAll: tool.schema.boolean().optional(),
 });
 
-function createQueueActionSchema(allowMutatingActions: boolean) {
-	if (allowMutatingActions) {
-		return tool.schema.discriminatedUnion("type", [
-			readLinesActionSchema,
-			grepPatternActionSchema,
-			executeBashActionSchema,
-			applyDiffActionSchema,
-		]);
-	}
-	return tool.schema.discriminatedUnion("type", [
-		readLinesActionSchema,
-		grepPatternActionSchema,
-		executeBashActionSchema,
-	]);
-}
+/** Driver-supplied explicit actions always allow all action types (matches Pi). */
+const driverQueueActionSchema = tool.schema.discriminatedUnion("type", [
+	readLinesActionSchema,
+	grepPatternActionSchema,
+	executeBashActionSchema,
+	applyDiffActionSchema,
+]);
 
 export function createBatchQueueZodArgs(config: ResolvedBatchQueueConfig) {
-	const queueActionSchema = createQueueActionSchema(config.allowObjectiveMutations);
-
 	return {
 		objective: tool.schema
 			.string()
@@ -59,7 +49,7 @@ export function createBatchQueueZodArgs(config: ResolvedBatchQueueConfig) {
 				"Use when the next few coding actions are obvious but tedious to enumerate; the executor plans up to N safe sequential actions.",
 			),
 		actions: tool.schema
-			.array(queueActionSchema)
+			.array(driverQueueActionSchema)
 			.min(1)
 			.max(config.maxBatchActions)
 			.optional()
