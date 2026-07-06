@@ -1,9 +1,11 @@
 import { assertObjectiveMutationPolicy, analyzerSystemPrompt } from "../analyzer.js";
-import type { ResolvedBatchQueueConfig } from "../config.js";
+import type { ModelRef, ResolvedBatchQueueConfig } from "../config.js";
 import { parseActionBatchPayload } from "../guards.js";
 import type { ActionBatchPayload } from "../payload.js";
+import { resolvePlanningModelRef } from "../planning-model.js";
 import { createSubmitActionBatchToolSchema } from "../schemas.js";
 import type { PluginInput } from "@opencode-ai/plugin";
+import { resolveOpenCodeSessionModelRef } from "./session-model.js";
 
 type OpenCodeClient = PluginInput["client"];
 type PromptResult = Awaited<ReturnType<OpenCodeClient["session"]["prompt"]>>;
@@ -27,18 +29,6 @@ type PromptBody = NonNullable<Parameters<OpenCodeClient["session"]["prompt"]>[0]
 
 function asPromptBody(body: ExecutorPromptBody): PromptBody {
 	return body as PromptBody;
-}
-
-function requireExecutorModel(config: ResolvedBatchQueueConfig): {
-	readonly provider: string;
-	readonly id: string;
-} {
-	if (!config.executorModel) {
-		throw new Error(
-			"batch_queue objective mode requires executorModel in config or BATCH_QUEUE_EXECUTOR",
-		);
-	}
-	return config.executorModel;
 }
 
 function extractStructuredOutput(result: PromptResult): unknown {
@@ -85,7 +75,7 @@ async function createPlanningSession(client: OpenCodeClient): Promise<string> {
 	});
 	const sessionID = created.data?.id;
 	if (!sessionID) {
-		throw new Error("failed to create executor planning session");
+		throw new Error("failed to create objective planning session");
 	}
 	return sessionID;
 }
@@ -121,17 +111,17 @@ function toPlainJsonSchema(config: ResolvedBatchQueueConfig): Record<string, unk
 	) as Record<string, unknown>;
 }
 
-async function promptExecutor(
+async function promptPlanningModel(
 	client: OpenCodeClient,
 	sessionID: string,
-	executorModel: { readonly provider: string; readonly id: string },
+	planningModel: ModelRef,
 	config: ResolvedBatchQueueConfig,
 	objective: string,
 ): Promise<PromptResult> {
 	const bodyBase: ExecutorPromptBody = {
 		model: {
-			providerID: executorModel.provider,
-			modelID: executorModel.id,
+			providerID: planningModel.provider,
+			modelID: planningModel.id,
 		},
 		parts: [{ type: "text", text: buildObjectivePrompt(objective, config) }],
 	};
@@ -160,18 +150,20 @@ async function promptExecutor(
 
 export async function analyzeOpenCodeBatchObjective(
 	client: OpenCodeClient,
+	parentSessionID: string,
 	objective: string,
 	config: ResolvedBatchQueueConfig,
 	_signal?: AbortSignal,
 ): Promise<ActionBatchPayload> {
-	const executorModel = requireExecutorModel(config);
+	const driverModel = await resolveOpenCodeSessionModelRef(client, parentSessionID);
+	const planningModel = resolvePlanningModelRef(driverModel, config);
 	const planningSessionID = await createPlanningSession(client);
 
 	try {
-		const result = await promptExecutor(
+		const result = await promptPlanningModel(
 			client,
 			planningSessionID,
-			executorModel,
+			planningModel,
 			config,
 			objective,
 		);
@@ -179,12 +171,12 @@ export async function analyzeOpenCodeBatchObjective(
 		const info = result.data?.info as StructuredPromptInfo | undefined;
 		const error = info?.error;
 		if (error?.name === "StructuredOutputError") {
-			throw new Error(error.message ?? "executor model failed to produce structured batch plan");
+			throw new Error(error.message ?? "planning model failed to produce structured batch plan");
 		}
 
 		const structured = extractStructuredOutput(result);
 		if (!structured) {
-			throw new Error("executor model did not return structured batch plan");
+			throw new Error("planning model did not return structured batch plan");
 		}
 
 		const payload = parseActionBatchPayload(structured, config.maxBatchActions);

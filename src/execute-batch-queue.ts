@@ -79,7 +79,7 @@ export async function executeBatchQueue(options: {
 		} else if (params.objective?.trim()) {
 			if (!deps.resolveObjective) {
 				return {
-					text: "batch_queue objective mode requires executorModel in config or BATCH_QUEUE_EXECUTOR",
+					text: "batch_queue objective mode requires a session driver model or executionModel in config",
 					isError: true,
 					error: "missing objective resolver",
 				};
@@ -106,7 +106,11 @@ export async function executeBatchQueue(options: {
 
 	const runner = getRunner(runners, deps.getSessionId(), deps.getCwd(), config);
 	const result = await runner.executeBatch(payload);
-	const text = formatBatchResult(result);
+	const usedObjective = Boolean(params.objective?.trim()) && !(params.actions && params.actions.length > 0);
+	const text = formatBatchResult(result, {
+		rationale: payload.rationale,
+		usedObjective,
+	});
 
 	return {
 		text,

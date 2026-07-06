@@ -20,14 +20,20 @@ export interface ModelRef {
 export interface BatchQueueConfig {
 	/**
 	 * Maximum actions permitted in a single batch turn.
-	 * Default: 5. Increase to allow larger batched tool calls (e.g. 10, 15).
+	 * Default: 10. Increase to allow larger batched tool calls.
 	 */
 	maxBatchActions?: number;
 	/**
-	 * Fast/cheap model that generates the structured action batch JSON.
-	 * The driver model is always the main model selected in Pi (ctx.model).
+	 * Optional cheap model for converting an `objective` into action batches.
+	 * When unset, the session driver / planner model is used.
+	 * JSON alias: `executionModel`.
 	 */
 	executorModel?: ModelRef;
+	/**
+	 * Optional cheap model for converting an `objective` into action batches.
+	 * When unset, the session driver / planner model is used.
+	 */
+	executionModel?: ModelRef;
 	/**
 	 * Whether objective-planned batches may include mutating actions such as
 	 * apply_diff. Direct `actions` batches are always allowed to include them.
@@ -41,8 +47,8 @@ export interface BatchQueueConfig {
 export interface ResolvedBatchQueueConfig {
 	readonly maxBatchActions: number;
 	/**
-	 * Optional fast/cheap model for objective planning.
-	 * When unset, the Pi session driver model (ctx.model) is used.
+	 * Optional cheap model for objective→actions conversion.
+	 * When unset, the session driver / planner model is used.
 	 */
 	readonly executorModel?: ModelRef;
 	readonly allowObjectiveMutations: boolean;
@@ -102,8 +108,10 @@ export function resolveBatchQueueConfig(
 		DEFAULT_MAX_BATCH_ACTIONS;
 
 	const executorModel =
+		overrides.executionModel ??
 		overrides.executorModel ??
 		parseExecutorFromEnv() ??
+		fileConfig.executionModel ??
 		fileConfig.executorModel;
 
 	return {

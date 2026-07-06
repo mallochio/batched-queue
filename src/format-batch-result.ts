@@ -1,6 +1,54 @@
 import { matchActionExecutionResult } from "./guards";
 import type { BatchExecutionResult } from "./results";
 
+export interface FormatBatchResultOptions {
+	readonly rationale?: string;
+	readonly usedObjective?: boolean;
+}
+
+function batchChangedWorkspace(result: BatchExecutionResult): boolean {
+	return result.results.some((actionResult) =>
+		actionResult.type === "apply_diff" && actionResult.applied,
+	);
+}
+
+export function buildBatchContinuationHints(
+	result: BatchExecutionResult,
+	options: FormatBatchResultOptions = {},
+): string[] {
+	const hints: string[] = [];
+
+	if (options.rationale?.trim()) {
+		hints.push(`plan rationale: ${options.rationale.trim()}`);
+	}
+
+	if (result.haltedPrematurely) {
+		const retryIndex = result.haltedAtIndex ?? result.completedCount;
+		hints.push(
+			`Replan: fix the failing step and call batch_queue again with explicit actions starting around index ${retryIndex}, or pass a refined objective.`,
+		);
+		return hints;
+	}
+
+	if (batchChangedWorkspace(result)) {
+		hints.push(
+			"Workspace changed (apply_diff applied). Re-read affected files or replan before assuming prior reads are current.",
+		);
+	}
+
+	if (options.usedObjective) {
+		hints.push(
+			"If the objective is not satisfied, call batch_queue again with a refined objective or switch to explicit actions for the next steps.",
+		);
+	} else {
+		hints.push(
+			"If more sequential steps remain, call batch_queue again with explicit actions (preferred) or a follow-up objective.",
+		);
+	}
+
+	return hints;
+}
+
 function formatActionResultLines(actionResult: BatchExecutionResult["results"][number]): string[] {
 	const lines: string[] = [
 		`[${actionResult.index}] ${actionResult.type} exit=${actionResult.exitCode} ${actionResult.success ? "ok" : "FAIL"}`,
@@ -40,7 +88,10 @@ function formatActionResultLines(actionResult: BatchExecutionResult["results"][n
 	return lines;
 }
 
-export function formatBatchResult(result: BatchExecutionResult): string {
+export function formatBatchResult(
+	result: BatchExecutionResult,
+	options: FormatBatchResultOptions = {},
+): string {
 	const lines: string[] = [
 		result.haltedPrematurely
 			? `batch halted at action ${result.haltedAtIndex ?? "?"} (${result.haltReason})`
@@ -48,6 +99,15 @@ export function formatBatchResult(result: BatchExecutionResult): string {
 		`completed ${result.completedCount}/${result.totalRequested} actions in ${result.durationMs}ms`,
 		`shell cwd: ${result.shellState.cwd}`,
 	];
+
+	const hints = buildBatchContinuationHints(result, options);
+	if (hints.length > 0) {
+		lines.push("");
+		lines.push("next steps:");
+		for (const hint of hints) {
+			lines.push(`- ${hint}`);
+		}
+	}
 
 	for (const actionResult of result.results) {
 		lines.push("");

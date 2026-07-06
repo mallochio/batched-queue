@@ -20,6 +20,7 @@ const TARGET_SETTINGS: Record<ConfigTarget, { readonly section: "pi" | "opencode
 export interface BatchQueueJsonConfig {
 	readonly maxBatchActions?: number;
 	readonly executorModel?: string | ModelRef;
+	readonly executionModel?: string | ModelRef;
 	readonly allowObjectiveMutations?: boolean;
 }
 
@@ -52,7 +53,9 @@ export function parseBatchQueueJsonConfig(raw: unknown): BatchQueueConfig {
 		config.maxBatchActions = raw.maxBatchActions;
 	}
 
-	const executorModel = parseModelRefValue(raw.executorModel);
+	const executorModel =
+		parseModelRefValue(raw.executionModel) ??
+		parseModelRefValue(raw.executorModel);
 	if (executorModel) {
 		config.executorModel = executorModel;
 	}

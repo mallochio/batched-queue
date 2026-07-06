@@ -8,6 +8,7 @@ import type { ActionBatchPayload } from "./payload.js";
 import type { ResolvedBatchQueueConfig } from "./config.js";
 import { createSubmitActionBatchToolSchema, QueueActionSchema } from "./schemas.js";
 import { parseActionBatchPayload } from "./guards.js";
+import { resolvePlanningModelRef } from "./planning-model.js";
 
 /** @deprecated Pass ModelRegistry directly to analyzeBatchObjective. */
 export type BatchAnalyzerContext = ModelRegistry;
@@ -91,9 +92,9 @@ export function analyzerSystemPrompt(config: ResolvedBatchQueueConfig): string {
 		];
 
 	return [
-		"You are the batch executor for a coding agent.",
+		"You are the batch planner for a coding agent.",
 		"Given an objective, emit a sequential action batch as JSON via the submit_action_batch tool.",
-		"Plan 2-5 low-risk sequential repo actions for inspect/search/check loops whenever possible.",
+		"Plan up to the configured maximum of low-risk sequential repo actions for inspect/search/check loops whenever possible.",
 		"Use deterministic actions: read/grep before shell.",
 		...mutationGuidance,
 		"Do not plan destructive, long-running, interactive, or approval-sensitive commands.",
@@ -127,7 +128,7 @@ function extractBatchFromResponse(
 			entry.name === "submit_action_batch",
 	);
 	if (!toolCall) {
-		throw new Error("executor model did not return submit_action_batch");
+		throw new Error("planning model did not return submit_action_batch");
 	}
 
 	return parseActionBatchPayload(toolCall.arguments, maxBatchActions);
@@ -148,8 +149,8 @@ export function assertObjectiveMutationPolicy(
 }
 
 /**
- * Plans a batch from an objective using the configured executor model, or the
- * Pi session driver model when no executor override is configured.
+ * Plans a batch from an objective using the session driver / planner model by default,
+ * or the configured cheap execution model when set.
  */
 export async function analyzeBatchObjective(
 	objective: string,
@@ -158,20 +159,22 @@ export async function analyzeBatchObjective(
 	config: ResolvedBatchQueueConfig,
 	signal?: AbortSignal,
 ): Promise<ActionBatchPayload> {
-	const executorModel: Model<Api> | undefined = config.executorModel
-		? modelRegistry.find(config.executorModel.provider, config.executorModel.id)
-		: driverModel;
+	const planningRef = resolvePlanningModelRef(
+		{ provider: driverModel.provider, id: driverModel.id },
+		config,
+	);
+	const planningModel: Model<Api> | undefined = modelRegistry.find(
+		planningRef.provider,
+		planningRef.id,
+	);
 
-	if (!executorModel) {
-		const ref = config.executorModel;
+	if (!planningModel) {
 		throw new Error(
-			ref
-				? `executor model not found: ${ref.provider}/${ref.id}`
-				: "executor model not available (missing Pi session driver model)",
+			`planning model not found: ${planningRef.provider}/${planningRef.id}`,
 		);
 	}
 
-	const auth = await modelRegistry.getApiKeyAndHeaders(executorModel);
+	const auth = await modelRegistry.getApiKeyAndHeaders(planningModel);
 	if (!auth.ok) {
 		throw new Error(auth.error);
 	}
@@ -183,7 +186,7 @@ export async function analyzeBatchObjective(
 
 	const complete = await resolveCompleteImplementation();
 	const response = await complete(
-		executorModel,
+		planningModel,
 		{
 			systemPrompt: analyzerSystemPrompt(config),
 			messages: [userMessage],
@@ -196,7 +199,7 @@ export async function analyzeBatchObjective(
 		throw new Error("batch analysis aborted");
 	}
 	if (response.stopReason === "error") {
-		throw new Error(response.errorMessage ?? "executor model request failed");
+		throw new Error(response.errorMessage ?? "planning model request failed");
 	}
 
 	const payload = extractBatchFromResponse(response, config.maxBatchActions);
@@ -209,7 +212,7 @@ export function createBatchQueueToolParameters(maxBatchActions: number) {
 		objective: Type.Optional(
 			Type.String({
 				description:
-					"Use when the next few coding actions are obvious but tedious to enumerate; the executor plans up to N safe sequential actions.",
+					"Use when the goal is clear but enumerating steps is tedious; the session driver plans by default, or a configured cheap execution model when set.",
 			}),
 		),
 		actions: Type.Optional(
@@ -217,7 +220,7 @@ export function createBatchQueueToolParameters(maxBatchActions: number) {
 				minItems: 1,
 				maxItems: maxBatchActions,
 				description:
-					"Pre-planned action batch from the driver model. Preferred when the exact deterministic reads, searches, checks, or edits are already known; skips executor analysis.",
+					"Pre-planned action batch from the session driver / planner. Preferred when the exact deterministic reads, searches, checks, or edits are already known; skips objective planning.",
 			}),
 		),
 		batchId: Type.Optional(

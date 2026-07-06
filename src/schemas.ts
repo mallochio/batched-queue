@@ -79,7 +79,7 @@ export function createActionBatchPayloadSchema(maxBatchActions: number = DEFAULT
 	);
 }
 
-/** Default schema using DEFAULT_MAX_BATCH_ACTIONS (5). */
+/** Default schema using DEFAULT_MAX_BATCH_ACTIONS (10). */
 export const ActionBatchPayloadSchema = createActionBatchPayloadSchema();
 
 export type ActionBatchPayloadSchemaType = Static<typeof ActionBatchPayloadSchema>;

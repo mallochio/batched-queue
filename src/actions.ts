@@ -33,7 +33,7 @@ export interface QueueActionMap {
 /** Extract the payload type for a specific action discriminator. */
 export type QueueActionOf<T extends ActionType> = QueueActionMap[T];
 
-/** Runtime-validated action list; length ceiling is enforced via config (default 5). */
+/** Runtime-validated action list; length ceiling is enforced via config (default 10). */
 export type ActionBatchActions = readonly QueueAction[];
 
 /** @deprecated Use ActionBatchActions; length is config-driven at runtime. */

@@ -111,6 +111,24 @@ describe("loadFileConfig", () => {
 			allowObjectiveMutations: false,
 		});
 	});
+
+	it("loads executionModel alias from project config", () => {
+		fs.mkdirSync(path.dirname(projectConfigPath), { recursive: true });
+		fs.writeFileSync(projectConfigPath, JSON.stringify({
+			executionModel: "openai/gpt-5.4-mini",
+		}));
+
+		const config = loadFileConfig({
+			cwd: tmpDir,
+			packageJsonPath,
+			projectConfigPath,
+		});
+
+		expect(config.executorModel).toEqual({
+			provider: "openai",
+			id: "gpt-5.4-mini",
+		});
+	});
 });
 
 describe("loadOpenCodeFileConfig", () => {
@@ -174,6 +192,7 @@ describe("loadOpenCodeFileConfig", () => {
 
 describe("resolveBatchQueueConfig precedence", () => {
 	const savedExecutor = process.env.BATCH_QUEUE_EXECUTOR;
+	const savedMaxActions = process.env.BATCH_QUEUE_MAX_ACTIONS;
 	const savedAllowObjectiveMutations = process.env.BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS;
 
 	afterEach(() => {
@@ -181,6 +200,11 @@ describe("resolveBatchQueueConfig precedence", () => {
 			delete process.env.BATCH_QUEUE_EXECUTOR;
 		} else {
 			process.env.BATCH_QUEUE_EXECUTOR = savedExecutor;
+		}
+		if (savedMaxActions === undefined) {
+			delete process.env.BATCH_QUEUE_MAX_ACTIONS;
+		} else {
+			process.env.BATCH_QUEUE_MAX_ACTIONS = savedMaxActions;
 		}
 		if (savedAllowObjectiveMutations === undefined) {
 			delete process.env.BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS;
@@ -222,6 +246,12 @@ describe("resolveBatchQueueConfig precedence", () => {
 			provider: "openai",
 			id: "gpt-5.4-mini",
 		});
+	});
+
+	it("defaults maxBatchActions to 10", () => {
+		delete process.env.BATCH_QUEUE_MAX_ACTIONS;
+		const resolved = resolveBatchQueueConfig();
+		expect(resolved.maxBatchActions).toBe(10);
 	});
 
 	it("disables objective mutations by default", () => {

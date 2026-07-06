@@ -112,10 +112,10 @@ if (toolResult.isError) {
 }
 
 const text = toolResult.content[0]?.type === "text" ? toolResult.content[0].text : "";
-if (!text.includes("batch completed successfully")) {
-	console.error("Unexpected batch result:\n", text);
-	process.exit(1);
-}
+	if (!text.includes("batch completed successfully") || !text.includes("next steps:")) {
+		console.error("Unexpected batch result:\n", text);
+		process.exit(1);
+	}
 
 for (const ext of loadResult.extensions) {
 	const handlers = ext.handlers.get("session_shutdown") ?? [];

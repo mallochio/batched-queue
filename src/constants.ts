@@ -1,5 +1,5 @@
 /** Default maximum actions per batch when no config override is provided. */
-export const DEFAULT_MAX_BATCH_ACTIONS = 5 as const;
+export const DEFAULT_MAX_BATCH_ACTIONS = 10 as const;
 
 /** @deprecated Use DEFAULT_MAX_BATCH_ACTIONS or ResolvedBatchQueueConfig.maxBatchActions */
 export const MAX_BATCH_ACTIONS = DEFAULT_MAX_BATCH_ACTIONS;

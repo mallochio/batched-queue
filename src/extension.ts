@@ -1,8 +1,8 @@
 /**
- * Pi extension — stateful batched action queue with driver/executor model split.
+ * Pi extension — stateful batched action queue with planner / execution model split.
  *
- * - Driver model: the main model selected in Pi (ctx.model) — invokes this tool
- * - Executor model: configurable fast model that plans action batches from objectives
+ * - Planner / driver model: the main model selected in Pi (ctx.model) — invokes and replans
+ * - Execution model: optional cheap model for objective→actions conversion when configured
  *
  * Configuration (in priority order, highest wins):
  * - extension factory overrides
@@ -28,34 +28,18 @@ import {
 	disposeAllRunners,
 	executeBatchQueue,
 } from "./execute-batch-queue";
+import { resolvePlanningModelRef } from "./planning-model";
 import { buildBatchQueueDescription } from "./tool-description";
 
 interface BatchQueueToolDetails {
 	readonly driverModel: { readonly provider: string; readonly id: string };
-	readonly executorModel: ModelRef;
+	readonly planningModel: ModelRef;
 	readonly maxBatchActions: number;
 	readonly result: BatchExecutionResult;
 }
 
 interface BatchQueueToolErrorDetails {
 	readonly error: string;
-}
-
-function resolveExecutorRef(
-	driverModel: Model<Api>,
-	config: ResolvedBatchQueueConfig,
-): ModelRef {
-	return config.executorModel ?? {
-		provider: driverModel.provider,
-		id: driverModel.id,
-	};
-}
-
-function executorDescription(config: ResolvedBatchQueueConfig): string {
-	if (config.executorModel) {
-		return `${config.executorModel.provider}/${config.executorModel.id} (configured executor model)`;
-	}
-	return "Pi session driver model (default; set executor in .pi/batched-queue.json, package.json pi.batchQueue, or BATCH_QUEUE_EXECUTOR)";
 }
 
 export function registerBatchedQueueExtension(
@@ -78,7 +62,7 @@ export function registerBatchedQueueExtension(
 
 	const description = buildBatchQueueDescription(
 		resolvedConfig,
-		`Driver model: Pi session model (ctx.model).\nExecutor model: ${executorDescription(resolvedConfig)}`,
+		"Pi session model (ctx.model)",
 	);
 
 	pi.registerTool({
@@ -86,11 +70,12 @@ export function registerBatchedQueueExtension(
 		label: "Batch Queue",
 		description,
 		promptSnippet:
-			"Batch 1-5 safe sequential repo actions: read, grep, short bash, or targeted diff",
+			"Batch up to 10 safe sequential repo actions: read, grep, short bash, or targeted diff",
 		promptGuidelines: [
-			"Use batch_queue for 2-5 safe sequential repo actions such as read, grep, and short checks.",
-			"Prefer explicit batch_queue actions when the exact steps are known.",
-			"Use batch_queue objective for read/check-only planning; pass explicit actions for apply_diff unless allowObjectiveMutations is enabled.",
+			"RGB-style loop: plan explicit batch_queue actions, execute with zero per-action LLM calls, then replan when results change or more steps remain.",
+			"Prefer explicit batch_queue actions when the exact steps are known, especially for apply_diff.",
+			"Use batch_queue objective only when the goal is clear but enumerating steps is tedious; the session driver plans by default.",
+			"After a batch completes, read the next-steps hints and call batch_queue again if the task is not finished.",
 			"Do not use batch_queue for long-running, interactive, destructive, or judgment-dependent steps.",
 		],
 		executionMode: "sequential",
@@ -165,7 +150,10 @@ export function registerBatchedQueueExtension(
 				};
 			}
 
-			const executorModel = resolveExecutorRef(driverModel, resolvedConfig);
+			const planningModel = resolvePlanningModelRef(
+				{ provider: driverModel.provider, id: driverModel.id },
+				resolvedConfig,
+			);
 
 			return {
 				content: [{ type: "text", text: executeResult.text }],
@@ -174,7 +162,7 @@ export function registerBatchedQueueExtension(
 						provider: driverModel.provider,
 						id: driverModel.id,
 					},
-					executorModel,
+					planningModel,
 					maxBatchActions: resolvedConfig.maxBatchActions,
 					result: executeResult.result,
 				} satisfies BatchQueueToolDetails,
@@ -187,7 +175,7 @@ export function registerBatchedQueueExtension(
 export default function (pi: ExtensionAPI) {
 	registerBatchedQueueExtension(pi, {
 		// Uncomment or override via env vars (see config.ts):
-		// maxBatchActions: 10,
-		// executorModel: { provider: "openrouter", id: "deepseek/deepseek-chat-v3-0324" },
+		// maxBatchActions: 15,
+		// executionModel: "openai/gpt-5.4-nano",
 	});
 }

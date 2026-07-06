@@ -46,7 +46,7 @@ export function createBatchQueueZodArgs(config: ResolvedBatchQueueConfig) {
 			.string()
 			.optional()
 			.describe(
-				"Use when the next few coding actions are obvious but tedious to enumerate; the executor plans up to N safe sequential actions.",
+				"Use when the goal is clear but enumerating steps is tedious; the session driver plans by default, or a configured cheap execution model when set.",
 			),
 		actions: tool.schema
 			.array(driverQueueActionSchema)
@@ -54,7 +54,7 @@ export function createBatchQueueZodArgs(config: ResolvedBatchQueueConfig) {
 			.max(config.maxBatchActions)
 			.optional()
 			.describe(
-				"Pre-planned action batch from the driver model. Preferred when the exact deterministic reads, searches, checks, or edits are already known; skips executor analysis.",
+				"Pre-planned action batch from the session driver / planner. Preferred when the exact deterministic reads, searches, checks, or edits are already known; skips objective planning.",
 			),
 		batchId: tool.schema
 			.string()

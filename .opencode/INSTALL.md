@@ -73,7 +73,7 @@ Settings merge in this order (highest wins):
 
 Copy [`.opencode/batched-queue.json.example`](batched-queue.json.example) to `.opencode/batched-queue.json`.
 
-**Note:** Unlike Pi, OpenCode objective mode requires an explicit `executorModel` in config. Explicit `actions` mode works without it.
+The planner / driver model is inherited from your OpenCode session (`opencode.json` → `model` or per-session selection). Only an optional cheap `executionModel` (alias: `executorModel`) needs configuration for objective batches.
 
 ## Verify
 
@@ -109,7 +109,7 @@ Then in `opencode.json`:
 
 ### Objective mode errors
 
-Set `executorModel` in `.opencode/batched-queue.json` or `BATCH_QUEUE_EXECUTOR=provider/model`.
+Set `executionModel` in `.opencode/batched-queue.json` or `BATCH_QUEUE_EXECUTOR=provider/model` when you want a cheaper model for objective→actions conversion. When unset, the session driver plans objective batches. Ensure the parent session has a model selected.
 
 ### Updating
 
@@ -119,7 +119,7 @@ Restart OpenCode after `git pull`. If the plugin does not update, clear OpenCode
 
 The `batch_queue` tool accepts:
 
-- `actions`: pre-planned batch (no LLM call)
-- `objective`: executor model plans read/check steps (requires `executorModel` config)
+- `actions`: pre-planned batch from the session driver (no LLM call)
+- `objective`: session driver plans by default, or configured execution model when set
 
 Action types: `read_lines`, `grep_pattern`, `execute_bash`, `apply_diff`.
