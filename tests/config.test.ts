@@ -38,10 +38,17 @@ describe("parseBatchQueueJsonConfig", () => {
 		});
 	});
 
+	it("parses executor thinking", () => {
+		expect(parseBatchQueueJsonConfig({ executorThinking: "high" })).toEqual({
+			executorThinking: "high",
+		});
+	});
+
 	it("ignores invalid values", () => {
 		expect(parseBatchQueueJsonConfig({
 			maxBatchActions: "nope",
 			executorModel: { provider: "", id: "x" },
+			executorThinking: "ultra",
 		})).toEqual({});
 	});
 });
@@ -95,6 +102,7 @@ describe("loadFileConfig", () => {
 		}));
 		fs.writeFileSync(projectConfigPath, JSON.stringify({
 			executorModel: "openai/gpt-5.4-mini",
+			executorThinking: "high",
 			maxBatchActions: 7,
 			allowObjectiveMutations: false,
 		}));
@@ -107,6 +115,7 @@ describe("loadFileConfig", () => {
 
 		expect(config).toEqual({
 			executorModel: { provider: "openai", id: "gpt-5.4-mini" },
+			executorThinking: "high",
 			maxBatchActions: 7,
 			allowObjectiveMutations: false,
 		});
@@ -192,6 +201,7 @@ describe("loadOpenCodeFileConfig", () => {
 
 describe("resolveBatchQueueConfig precedence", () => {
 	const savedExecutor = process.env.BATCH_QUEUE_EXECUTOR;
+	const savedExecutorThinking = process.env.BATCH_QUEUE_EXECUTOR_THINKING;
 	const savedMaxActions = process.env.BATCH_QUEUE_MAX_ACTIONS;
 	const savedAllowObjectiveMutations = process.env.BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS;
 
@@ -200,6 +210,11 @@ describe("resolveBatchQueueConfig precedence", () => {
 			delete process.env.BATCH_QUEUE_EXECUTOR;
 		} else {
 			process.env.BATCH_QUEUE_EXECUTOR = savedExecutor;
+		}
+		if (savedExecutorThinking === undefined) {
+			delete process.env.BATCH_QUEUE_EXECUTOR_THINKING;
+		} else {
+			process.env.BATCH_QUEUE_EXECUTOR_THINKING = savedExecutorThinking;
 		}
 		if (savedMaxActions === undefined) {
 			delete process.env.BATCH_QUEUE_MAX_ACTIONS;
@@ -233,6 +248,12 @@ describe("resolveBatchQueueConfig precedence", () => {
 			provider: "openai",
 			id: "gpt-5.4-nano",
 		});
+	});
+
+	it("prefers env executor thinking over file config", () => {
+		process.env.BATCH_QUEUE_EXECUTOR_THINKING = "high";
+		const resolved = resolveBatchQueueConfig({}, { executorThinking: "low" });
+		expect(resolved.executorThinking).toBe("high");
 	});
 
 	it("prefers factory overrides over env and file config", () => {

@@ -19,6 +19,7 @@ interface StructuredPromptInfo {
 interface ExecutorPromptBody {
 	readonly model: { readonly providerID: string; readonly modelID: string };
 	readonly parts: Array<{ readonly type: "text"; readonly text: string }>;
+	readonly variant?: string;
 	readonly format?: {
 		readonly type: "json_schema";
 		readonly schema: Record<string, unknown>;
@@ -124,6 +125,7 @@ async function promptPlanningModel(
 			modelID: planningModel.id,
 		},
 		parts: [{ type: "text", text: buildObjectivePrompt(objective, config) }],
+		...(config.executorThinking ? { variant: config.executorThinking } : {}),
 	};
 
 	try {

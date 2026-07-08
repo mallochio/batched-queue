@@ -31,6 +31,7 @@ type CompleteImplementation = (
 		readonly headers?: Record<string, string>;
 		readonly signal?: AbortSignal;
 		readonly toolChoice?: string;
+		readonly reasoningEffort?: string;
 	},
 ) => Promise<CompleteResponse>;
 
@@ -192,7 +193,13 @@ export async function analyzeBatchObjective(
 			messages: [userMessage],
 			tools: [buildSubmitBatchTool(config)],
 		},
-		{ apiKey: auth.apiKey, headers: auth.headers, signal, toolChoice: "any" },
+		{
+			apiKey: auth.apiKey,
+			headers: auth.headers,
+			signal,
+			toolChoice: "any",
+			...(config.executorThinking ? { reasoningEffort: config.executorThinking } : {}),
+		},
 	);
 
 	if (response.stopReason === "aborted") {

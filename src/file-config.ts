@@ -1,8 +1,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { BatchQueueConfig, ModelRef } from "./config.js";
-import { parseModelRefString } from "./config.js";
+import type { BatchQueueConfig, ExecutorThinkingLevel, ModelRef } from "./config.js";
+import { parseExecutorThinking, parseModelRefString } from "./config.js";
 
 const PI_PROJECT_CONFIG_RELATIVE = path.join(".pi", "batched-queue.json");
 const OPENCODE_PROJECT_CONFIG_RELATIVE = path.join(".opencode", "batched-queue.json");
@@ -21,6 +21,7 @@ export interface BatchQueueJsonConfig {
 	readonly maxBatchActions?: number;
 	readonly executorModel?: string | ModelRef;
 	readonly executionModel?: string | ModelRef;
+	readonly executorThinking?: ExecutorThinkingLevel;
 	readonly allowObjectiveMutations?: boolean;
 }
 
@@ -58,6 +59,11 @@ export function parseBatchQueueJsonConfig(raw: unknown): BatchQueueConfig {
 		parseModelRefValue(raw.executorModel);
 	if (executorModel) {
 		config.executorModel = executorModel;
+	}
+
+	const executorThinking = parseExecutorThinking(raw.executorThinking);
+	if (executorThinking) {
+		config.executorThinking = executorThinking;
 	}
 
 	if (typeof raw.allowObjectiveMutations === "boolean") {

@@ -13,6 +13,8 @@ export interface ModelRef {
 	readonly id: string;
 }
 
+export type ExecutorThinkingLevel = "minimal" | "low" | "medium" | "high" | "xhigh";
+
 /**
  * User-facing configuration for the batched queue extension.
  * Passed to the Pi extension factory, loaded from JSON files, and/or env vars.
@@ -35,6 +37,12 @@ export interface BatchQueueConfig {
 	 */
 	executionModel?: ModelRef;
 	/**
+	 * Optional reasoning/thinking effort for objective→actions conversion.
+	 * Applied best-effort: Pi forwards it as provider reasoningEffort; OpenCode
+	 * forwards it as the prompt variant.
+	 */
+	executorThinking?: ExecutorThinkingLevel;
+	/**
 	 * Whether objective-planned batches may include mutating actions such as
 	 * apply_diff. Direct `actions` batches are always allowed to include them.
 	 * Default: false.
@@ -51,6 +59,7 @@ export interface ResolvedBatchQueueConfig {
 	 * When unset, the session driver / planner model is used.
 	 */
 	readonly executorModel?: ModelRef;
+	readonly executorThinking?: ExecutorThinkingLevel;
 	readonly allowObjectiveMutations: boolean;
 	readonly pathSecurity: PathSecurityConfig;
 }
@@ -59,6 +68,7 @@ const ENV_MAX_ACTIONS = "BATCH_QUEUE_MAX_ACTIONS";
 const ENV_EXECUTOR = "BATCH_QUEUE_EXECUTOR";
 const ENV_EXECUTOR_PROVIDER = "BATCH_QUEUE_EXECUTOR_PROVIDER";
 const ENV_EXECUTOR_MODEL = "BATCH_QUEUE_EXECUTOR_MODEL";
+const ENV_EXECUTOR_THINKING = "BATCH_QUEUE_EXECUTOR_THINKING";
 const ENV_ALLOW_OBJECTIVE_MUTATIONS = "BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS";
 
 function parsePositiveInt(value: string | undefined): number | undefined {
@@ -97,6 +107,14 @@ function parseBooleanEnv(value: string | undefined): boolean | undefined {
 	return undefined;
 }
 
+export function parseExecutorThinking(value: unknown): ExecutorThinkingLevel | undefined {
+	if (typeof value !== "string") return undefined;
+	const normalized = value.trim().toLowerCase();
+	return ["minimal", "low", "medium", "high", "xhigh"].includes(normalized)
+		? normalized as ExecutorThinkingLevel
+		: undefined;
+}
+
 export function resolveBatchQueueConfig(
 	overrides: BatchQueueConfig = {},
 	fileConfig: BatchQueueConfig = {},
@@ -114,9 +132,15 @@ export function resolveBatchQueueConfig(
 		fileConfig.executionModel ??
 		fileConfig.executorModel;
 
+	const executorThinking =
+		overrides.executorThinking ??
+		parseExecutorThinking(process.env[ENV_EXECUTOR_THINKING]) ??
+		fileConfig.executorThinking;
+
 	return {
 		maxBatchActions,
 		...(executorModel ? { executorModel } : {}),
+		...(executorThinking ? { executorThinking } : {}),
 		allowObjectiveMutations:
 			overrides.allowObjectiveMutations ??
 			parseBooleanEnv(process.env[ENV_ALLOW_OBJECTIVE_MUTATIONS]) ??

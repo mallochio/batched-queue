@@ -1,5 +1,6 @@
 {
   "executionModel": "openai/gpt-5.4-nano",
+  "executorThinking": "high",
   "maxBatchActions": 10,
   "allowObjectiveMutations": false
 }
