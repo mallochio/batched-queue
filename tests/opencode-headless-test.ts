@@ -67,7 +67,7 @@ if (result.startsWith("ERROR:")) {
 	process.exit(1);
 }
 
-if (!result.includes("batch completed successfully") || !result.includes("next steps:")) {
+if (!result.includes("✅ batch completed") || !result.includes("### Next steps")) {
 	console.error("Unexpected batch result:\n", result);
 	process.exit(1);
 }

@@ -108,7 +108,7 @@ if (toolResult.isError) {
 }
 
 const text = toolResult.content[0]?.type === "text" ? toolResult.content[0].text : "";
-if (!text.includes("batch completed successfully") && !text.includes("read_lines")) {
+if (!text.includes("✅ batch completed") && !text.includes("read_lines")) {
 	console.error("Unexpected objective batch result:\n", text);
 	process.exit(1);
 }

@@ -113,7 +113,7 @@ if (toolResult.isError) {
 }
 
 const text = toolResult.content[0]?.type === "text" ? toolResult.content[0].text : "";
-	if (!text.includes("batch completed successfully") || !text.includes("next steps:")) {
+	if (!text.includes("✅ batch completed") || !text.includes("### Next steps")) {
 		console.error("Unexpected batch result:\n", text);
 		process.exit(1);
 	}

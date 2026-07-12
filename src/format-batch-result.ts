@@ -49,42 +49,59 @@ export function buildBatchContinuationHints(
 	return hints;
 }
 
+function codeFence(language: string, text: string): string[] {
+	return [`\`\`\`${language}`, text, "\`\`\`"];
+}
+
+function collapsibleBlock(title: string, language: string, text: string): string[] {
+	return ["<details>", `<summary>${title}</summary>`, "", ...codeFence(language, text), "", "</details>"];
+}
+
 function formatActionResultLines(actionResult: BatchExecutionResult["results"][number]): string[] {
-	const lines: string[] = [
-		`[${actionResult.index}] ${actionResult.type} exit=${actionResult.exitCode} ${actionResult.success ? "ok" : "FAIL"}`,
-	];
+	const ok = actionResult.success ? "✅" : "❌";
+	const exit = actionResult.exitCode === 0 ? "" : ` exit=${actionResult.exitCode}`;
+	const lines: string[] = [`#### ${ok} [${actionResult.index}] ${actionResult.type}${exit}`];
 	if (actionResult.error) {
-		lines.push(`  error: ${actionResult.error}`);
+		lines.push("", `**Error:** ${actionResult.error}`);
 	}
 
 	const detailLines = matchActionExecutionResult(actionResult, {
 		read_lines: (result) => {
-			if (!result.formatted) return [];
-			return result.formatted.split("\n").slice(0, 20).map((line) => `  ${line}`);
+			const range = result.requestedRange
+				? `:${result.requestedRange.startLine}-${result.requestedRange.endLine}`
+				: "";
+			const lines = [`${result.path}${range}`];
+			if (result.formatted) {
+				lines.push("", ...codeFence("text", result.formatted));
+			}
+			return lines;
 		},
-		grep_pattern: (result) =>
-			result.matches
-				.slice(0, 10)
-				.map((match) => `  ${match.path}:${match.lineNumber}: ${match.text}`),
-		execute_bash: (result) => {
-			const output: string[] = [];
-			if (result.stdout.text) {
-				output.push(
-					`  stdout:\n${result.stdout.text.split("\n").map((line) => `    ${line}`).join("\n")}`,
+		grep_pattern: (result) => {
+			const lines = [`/${oneLine(result.pattern)}/ (${result.matchCount} matches)`];
+			if (result.matches.length > 0) {
+				lines.push(
+					"",
+					...codeFence("text", result.matches.slice(0, 20).map((match) => `${match.path}:${match.lineNumber}: ${match.text}`).join("\n")),
 				);
 			}
+			return lines;
+		},
+		execute_bash: (result) => {
+			const output = codeFence("bash", result.command);
+			if (result.stdout.text) {
+				output.push("", ...collapsibleBlock("stdout", "text", result.stdout.text));
+			}
 			if (result.stderr.text) {
-				output.push(
-					`  stderr:\n${result.stderr.text.split("\n").map((line) => `    ${line}`).join("\n")}`,
-				);
+				output.push("", ...collapsibleBlock("stderr", "text", result.stderr.text));
 			}
 			return output;
 		},
 		apply_diff: (result) => [
-			`  applied=${result.applied} strategy=${result.matchStrategy ?? "n/a"} bytes ${result.bytesBefore}->${result.bytesAfter}`,
+			`${result.path} (${result.applied ? "applied" : "not applied"})`,
+			`applied=${result.applied} strategy=${result.matchStrategy ?? "n/a"} bytes ${result.bytesBefore}->${result.bytesAfter}`,
 		],
 	});
-	lines.push(...detailLines);
+	lines.push("", ...detailLines);
 	return lines;
 }
 
@@ -160,26 +177,28 @@ export function formatBatchResult(
 	result: BatchExecutionResult,
 	options: FormatBatchResultOptions = {},
 ): string {
+	const status = result.haltedPrematurely
+		? `❌ batch halted at action ${result.haltedAtIndex ?? "?"} (${result.haltReason})`
+		: "✅ batch completed";
 	const lines: string[] = [
-		result.haltedPrematurely
-			? `batch halted at action ${result.haltedAtIndex ?? "?"} (${result.haltReason})`
-			: "batch completed successfully",
-		`completed ${result.completedCount}/${result.totalRequested} actions in ${result.durationMs}ms`,
-		`shell cwd: ${result.shellState.cwd}`,
+		`${status} (${result.completedCount}/${result.totalRequested} actions, ${result.durationMs}ms)`,
+		"",
+		`- cwd: \`${result.shellState.cwd}\``,
 	];
 
 	const hints = buildBatchContinuationHints(result, options);
-	if (hints.length > 0) {
-		lines.push("");
-		lines.push("next steps:");
-		for (const hint of hints) {
-			lines.push(`- ${hint}`);
+	if (result.results.length > 0) {
+		lines.push("", "### Executed actions");
+		for (const actionResult of result.results) {
+			lines.push("", ...formatActionResultLines(actionResult));
 		}
 	}
 
-	for (const actionResult of result.results) {
-		lines.push("");
-		lines.push(...formatActionResultLines(actionResult));
+	if (hints.length > 0) {
+		lines.push("", "### Next steps");
+		for (const hint of hints) {
+			lines.push(`- ${hint}`);
+		}
 	}
 
 	return lines.join("\n");

@@ -90,19 +90,39 @@ describe("buildBatchContinuationHints", () => {
 		expect(compact).not.toContain("stdout:");
 
 		const expanded = formatBatchResultPreview(result, { expanded: true });
-		expect(expanded).toContain("stdout:");
+		expect(expanded).toContain("<summary>stdout</summary>");
 	});
 
 });
 
 describe("formatBatchResult", () => {
-	it("renders next-steps section", () => {
-		const text = formatBatchResult(baseResult(), {
+	it("renders ACP-friendly markdown", () => {
+		const command = "printf 'ok'";
+		const text = formatBatchResult(baseResult({
+			results: [
+				{
+					index: 0,
+					type: "execute_bash",
+					success: true,
+					exitCode: 0,
+					durationMs: 1,
+					command,
+					stdout: { text: "ok" },
+					stderr: { text: "" },
+				},
+			],
+		}), {
 			rationale: "inspect entrypoints",
 			usedObjective: true,
 		});
-		expect(text).toContain("next steps:");
+
+		expect(text).toContain("✅ batch completed");
+		expect(text).toContain("- cwd: `/tmp`");
+		expect(text).toContain("### Executed actions");
+		expect(text).toContain("#### ✅ [0] execute_bash");
+		expect(text).toContain("```bash\n" + command + "\n```");
+		expect(text).toContain("<summary>stdout</summary>");
+		expect(text).toContain("### Next steps");
 		expect(text).toContain("plan rationale: inspect entrypoints");
-		expect(text).toContain("batch completed successfully");
 	});
 });
