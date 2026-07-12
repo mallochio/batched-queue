@@ -109,41 +109,53 @@ export function registerBatchedQueueExtension(
 			if (details && "result" in details) {
 				const batch = details.result;
 				const usedObjective = Boolean(context.args?.objective?.trim()) && !context.args?.actions?.length;
+
+				const statusIcon = batch.haltedPrematurely ? "✗" : "✓";
+				const statusText = batch.haltedPrematurely ? `batch halted at action ${batch.haltedAtIndex ?? "?"} (${batch.haltReason})` : "batch completed";
+				const statusColor = batch.haltedPrematurely ? "error" : "success";
+
 				const lines = [
-					batch.haltedPrematurely
-						? theme.fg("error", `✗ batch halted at action ${batch.haltedAtIndex ?? "?"} (${batch.haltReason})`)
-						: theme.fg("success", "✓ batch completed"),
-					theme.fg("toolOutput", `${batch.completedCount}/${batch.totalRequested} actions · ${batch.durationMs}ms`),
-					theme.fg("muted", `cwd: ${batch.shellState.cwd}`),
+					theme.fg(statusColor, `${statusIcon} ${statusText}`) + theme.fg("muted", ` (${batch.completedCount}/${batch.totalRequested} actions, ${batch.durationMs}ms)`),
+					theme.fg("muted", `  cwd:   ${batch.shellState.cwd}`),
 				];
 
 				if (usedObjective) {
-					lines.push(theme.fg("muted", `objective model: ${details.planningModel.provider}/${details.planningModel.id}`));
+					const thinkingStr = resolvedConfig.executorThinking ? ` (reasoning: ${resolvedConfig.executorThinking})` : "";
+					lines.push(theme.fg("muted", `  model: ${details.planningModel.provider}/${details.planningModel.id}${thinkingStr}`));
 				}
 
 				if (batch.results.length > 0) {
-					lines.push("", theme.fg("toolTitle", theme.bold("executed actions")));
+					lines.push("", theme.fg("border", "─── ") + theme.fg("toolTitle", theme.bold("Executed Actions ")) + theme.fg("border", "─────────────────────"), "");
 					for (const action of batch.results) {
 						const ok = action.success ? "✓" : "✗";
+						const color = action.success ? "success" : "error";
 						const exit = action.exitCode === 0 ? "" : ` exit=${action.exitCode}`;
-						const label = `[${ok} ${String(action.index).padStart(2, " ")} ${action.type}${exit}]`;
-						lines.push("", theme.fg(action.success ? "success" : "error", label));
+						const label = `${theme.fg(color, ok)} ${theme.fg("muted", `[${action.index}]`)} ${theme.fg("toolOutput", action.type)}${theme.fg(color, exit)}`;
+						lines.push(label);
+
+						let bodyLines: string[] = [];
 						if (action.type === "execute_bash") {
-							lines.push(...highlightCode(action.command, "bash"));
+							bodyLines = highlightCode(action.command, "bash");
 						} else if (action.type === "read_lines") {
 							const range = action.requestedRange ? `:${action.requestedRange.startLine}-${action.requestedRange.endLine}` : "";
-							lines.push(theme.fg("toolOutput", `${action.path}${range}`));
+							bodyLines = [theme.fg("toolOutput", `${action.path}${range}`)];
 						} else if (action.type === "grep_pattern") {
-							lines.push(theme.fg("toolOutput", `/${action.pattern}/ (${action.matchCount} matches)`));
+							bodyLines = [theme.fg("toolOutput", `/${action.pattern}/ (${action.matchCount} matches)`)];
 						} else {
-							lines.push(theme.fg("toolOutput", `${action.path} (${action.applied ? "applied" : "not applied"})`));
+							bodyLines = [theme.fg("toolOutput", `${action.path} (${action.applied ? "applied" : "not applied"})`)];
 						}
+
+						lines.push(...bodyLines.map(l => `  ${l}`), "");
 					}
 				}
 
 				const hints = buildBatchContinuationHints(batch, { usedObjective });
 				if (hints.length > 0) {
-					lines.push("", theme.fg("muted", `next: ${hints[0]}`));
+					if (batch.results.length === 0) lines.push("");
+					lines.push(theme.fg("border", "─── ") + theme.fg("toolTitle", theme.bold("Next Steps ")) + theme.fg("border", "───────────────────────────"));
+					for (const hint of hints) {
+						lines.push(theme.fg("toolOutput", `• ${hint}`));
+					}
 				}
 
 				text.setText(lines.join("\n"));
