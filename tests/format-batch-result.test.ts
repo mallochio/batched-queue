@@ -2,7 +2,6 @@ import { describe, expect, it } from "bun:test";
 import {
 	formatBatchResult,
 	buildBatchContinuationHints,
-	formatBatchResultMarkdownPreview,
 	formatBatchResultPreview,
 } from "../src/format-batch-result";
 import type { BatchExecutionResult } from "../src/results";
@@ -93,30 +92,7 @@ describe("buildBatchContinuationHints", () => {
 		const expanded = formatBatchResultPreview(result, { expanded: true });
 		expect(expanded).toContain("stdout:");
 	});
-	it("renders markdown preview with fenced commands and cwd", () => {
-		const command = "python3 - <<'PY'\nprint('ok')\nPY";
-		const markdown = formatBatchResultMarkdownPreview(
-			baseResult({
-				results: [
-					{
-						index: 0,
-						type: "execute_bash",
-						success: true,
-						exitCode: 0,
-						durationMs: 1,
-						command,
-						stdout: { text: "ok" },
-						stderr: { text: "" },
-					},
-				],
-			}),
-		);
 
-		expect(markdown).toContain("cwd: `/tmp`");
-		expect(markdown).toContain("**executed actions**");
-		expect(markdown).toContain("[✓  0 bash]");
-		expect(markdown).toContain("````bash\n" + command + "\n````");
-	});
 });
 
 describe("formatBatchResult", () => {

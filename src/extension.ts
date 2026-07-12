@@ -12,8 +12,8 @@
  */
 
 import type { Api, Model } from "@earendil-works/pi-ai";
-import { getMarkdownTheme, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Markdown, Text } from "@earendil-works/pi-tui";
+import { highlightCode, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import {
 	type BatchQueueConfig,
 	resolveBatchQueueConfig,
@@ -30,7 +30,7 @@ import {
 } from "./execute-batch-queue";
 import { resolvePlanningModelRef } from "./planning-model";
 import { buildBatchQueueDescription } from "./tool-description";
-import { formatBatchResultMarkdownPreview } from "./format-batch-result";
+import { buildBatchContinuationHints } from "./format-batch-result";
 
 interface BatchQueueToolDetails {
 	readonly driverModel: { readonly provider: string; readonly id: string };
@@ -86,18 +86,12 @@ export function registerBatchedQueueExtension(
 		renderCall(args, theme, context) {
 			const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
 			if (args.actions?.length) {
-				const actionLabels = args.actions
-					.map((action: { type?: string; path?: string; command?: string; pattern?: string }) => {
-						const target = action.command ?? action.path ?? action.pattern;
-						const label = target
-							? `${action.type ?? "?"}: ${target.replace(/\s+/g, " ").trim()}`
-							: action.type ?? "?";
-						return label;
-					})
+				const actionTypes = args.actions
+					.map((action: { type?: string }) => action.type ?? "?")
 					.join(" → ");
 				text.setText(
 					theme.fg("toolTitle", theme.bold("batch_queue")) +
-						theme.fg("toolOutput", ` ${args.actions.length} actions: ${actionLabels}`),
+						theme.fg("toolOutput", ` ${args.actions.length} actions: ${actionTypes}`),
 				);
 				return text;
 			}
@@ -110,18 +104,52 @@ export function registerBatchedQueueExtension(
 		},
 
 		renderResult(result, opts, theme, context) {
+			const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
 			const details = result.details as BatchQueueToolDetails | BatchQueueToolErrorDetails | undefined;
 			if (details && "result" in details) {
-				const markdown = (context.lastComponent as Markdown | undefined) ?? new Markdown("", 0, 0, getMarkdownTheme());
-				markdown.setText(
-					formatBatchResultMarkdownPreview(details.result, {
-						usedObjective: Boolean(context.args?.objective?.trim()) && !context.args?.actions?.length,
-					}),
-				);
-				return markdown;
+				const batch = details.result;
+				const usedObjective = Boolean(context.args?.objective?.trim()) && !context.args?.actions?.length;
+				const lines = [
+					batch.haltedPrematurely
+						? theme.fg("error", `✗ batch halted at action ${batch.haltedAtIndex ?? "?"} (${batch.haltReason})`)
+						: theme.fg("success", "✓ batch completed"),
+					theme.fg("toolOutput", `${batch.completedCount}/${batch.totalRequested} actions · ${batch.durationMs}ms`),
+					theme.fg("muted", `cwd: ${batch.shellState.cwd}`),
+				];
+
+				if (usedObjective) {
+					lines.push(theme.fg("muted", `objective model: ${details.planningModel.provider}/${details.planningModel.id}`));
+				}
+
+				if (batch.results.length > 0) {
+					lines.push("", theme.fg("toolTitle", theme.bold("executed actions")));
+					for (const action of batch.results) {
+						const ok = action.success ? "✓" : "✗";
+						const exit = action.exitCode === 0 ? "" : ` exit=${action.exitCode}`;
+						const label = `[${ok} ${String(action.index).padStart(2, " ")} ${action.type}${exit}]`;
+						lines.push("", theme.fg(action.success ? "success" : "error", label));
+						if (action.type === "execute_bash") {
+							lines.push(...highlightCode(action.command, "bash"));
+						} else if (action.type === "read_lines") {
+							const range = action.requestedRange ? `:${action.requestedRange.startLine}-${action.requestedRange.endLine}` : "";
+							lines.push(theme.fg("toolOutput", `${action.path}${range}`));
+						} else if (action.type === "grep_pattern") {
+							lines.push(theme.fg("toolOutput", `/${action.pattern}/ (${action.matchCount} matches)`));
+						} else {
+							lines.push(theme.fg("toolOutput", `${action.path} (${action.applied ? "applied" : "not applied"})`));
+						}
+					}
+				}
+
+				const hints = buildBatchContinuationHints(batch, { usedObjective });
+				if (hints.length > 0) {
+					lines.push("", theme.fg("muted", `next: ${hints[0]}`));
+				}
+
+				text.setText(lines.join("\n"));
+				return text;
 			}
 
-			const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
 			const content = result.content[0];
 			text.setText(theme.fg(context.isError ? "error" : "toolOutput", content?.type === "text" ? content.text : ""));
 			return text;
