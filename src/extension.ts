@@ -86,12 +86,18 @@ export function registerBatchedQueueExtension(
 		renderCall(args, theme, context) {
 			const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
 			if (args.actions?.length) {
-				const actionTypes = args.actions
-					.map((action: { type?: string }) => action.type ?? "?")
+				const actionLabels = args.actions
+					.map((action: { type?: string; path?: string; command?: string; pattern?: string }) => {
+						const target = action.command ?? action.path ?? action.pattern;
+						const label = target
+							? `${action.type ?? "?"}: ${target.replace(/\s+/g, " ").trim().slice(0, 50)}`
+							: action.type ?? "?";
+						return label;
+					})
 					.join(" → ");
 				text.setText(
 					theme.fg("toolTitle", theme.bold("batch_queue")) +
-						theme.fg("toolOutput", ` ${args.actions.length} actions: ${actionTypes}`),
+						theme.fg("toolOutput", ` ${args.actions.length} actions: ${actionLabels}`),
 				);
 				return text;
 			}

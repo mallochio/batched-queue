@@ -92,10 +92,29 @@ export interface FormatBatchResultPreviewOptions extends FormatBatchResultOption
 	readonly expanded?: boolean;
 }
 
+function oneLine(text: string, maxLength = 80): string {
+	const normalized = text.replace(/\s+/g, " ").trim();
+	return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 1)}…` : normalized;
+}
+
+function formatActionTarget(actionResult: BatchExecutionResult["results"][number]): string {
+	return matchActionExecutionResult(actionResult, {
+		read_lines: (result) => {
+			const range = result.requestedRange
+				? `:${result.requestedRange.startLine}-${result.requestedRange.endLine}`
+				: "";
+			return `${result.path}${range}`;
+		},
+		grep_pattern: (result) => `/${oneLine(result.pattern, 40)}/ (${result.matchCount} matches)`,
+		execute_bash: (result) => oneLine(result.command),
+		apply_diff: (result) => `${result.path} (${result.applied ? "applied" : "not applied"})`,
+	});
+}
+
 function formatActionSummary(actionResult: BatchExecutionResult["results"][number]): string {
 	const status = actionResult.success ? "✓" : "✗";
 	const exit = actionResult.exitCode === 0 ? "" : ` exit=${actionResult.exitCode}`;
-	return `${status} [${actionResult.index}] ${actionResult.type}${exit}`;
+	return `${status} [${actionResult.index}] ${actionResult.type}: ${formatActionTarget(actionResult)}${exit}`;
 }
 
 export function formatBatchResultPreview(
