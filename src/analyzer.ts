@@ -91,7 +91,15 @@ export async function resolveCompleteImplementation(): Promise<CompleteImplement
 	return completeImplementationPromise;
 }
 
-export function analyzerSystemPrompt(config: ResolvedBatchQueueConfig): string {
+/**
+ * @param withGrounding When true, include guidance for the inspect_read/inspect_grep
+ * tools. Only the Pi tool-loop path offers those tools; the OpenCode structured-output
+ * path must not advertise them.
+ */
+export function analyzerSystemPrompt(
+	config: ResolvedBatchQueueConfig,
+	withGrounding = false,
+): string {
 	const mutationGuidance = config.allowObjectiveMutations
 		? [
 			"Mutate only when the objective clearly requires it.",
@@ -102,7 +110,7 @@ export function analyzerSystemPrompt(config: ResolvedBatchQueueConfig): string {
 		];
 
 	const groundingGuidance =
-		config.groundingTurns > 0
+		withGrounding && config.groundingTurns > 0
 			? [
 				`Ground before planning: you may call inspect_read and inspect_grep up to ${config.groundingTurns} times to look at the real repo first.`,
 				"Inspect only enough to plan accurately, then call submit_action_batch. Do not inspect once you have enough context.",
@@ -282,7 +290,7 @@ export async function planBatchWithGrounding(deps: PlanBatchDeps): Promise<Actio
 		{ role: "user", content: [{ type: "text", text: objective }], timestamp: Date.now() },
 	];
 
-	const systemPrompt = analyzerSystemPrompt(config);
+	const systemPrompt = analyzerSystemPrompt(config, grounding);
 	// One request per grounding turn, plus a final forced submit.
 	for (let turn = 0; turn <= config.groundingTurns; turn += 1) {
 		const lastTurn = turn === config.groundingTurns;
