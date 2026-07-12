@@ -84,7 +84,7 @@ describe("buildBatchContinuationHints", () => {
 
 		const compact = formatBatchResultPreview(result);
 		expect(compact).toContain("✓ batch completed");
-		expect(compact).toContain("actions: ✓ [0] execute_bash: printf ok");
+		expect(compact).toContain("actions:\n  ✓  0 bash  printf ok");
 		expect(compact).not.toContain("stdout:");
 
 		const expanded = formatBatchResultPreview(result, { expanded: true });

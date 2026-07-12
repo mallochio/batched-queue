@@ -111,10 +111,19 @@ function formatActionTarget(actionResult: BatchExecutionResult["results"][number
 	});
 }
 
+function formatActionLabel(actionResult: BatchExecutionResult["results"][number]): string {
+	return matchActionExecutionResult(actionResult, {
+		read_lines: () => "read",
+		grep_pattern: () => "grep",
+		execute_bash: () => "bash",
+		apply_diff: () => "patch",
+	});
+}
+
 function formatActionSummary(actionResult: BatchExecutionResult["results"][number]): string {
 	const status = actionResult.success ? "✓" : "✗";
 	const exit = actionResult.exitCode === 0 ? "" : ` exit=${actionResult.exitCode}`;
-	return `${status} [${actionResult.index}] ${actionResult.type}: ${formatActionTarget(actionResult)}${exit}`;
+	return `${status} ${String(actionResult.index).padStart(2, " ")} ${formatActionLabel(actionResult).padEnd(5)} ${formatActionTarget(actionResult)}${exit}`;
 }
 
 export function formatBatchResultPreview(
@@ -134,7 +143,10 @@ export function formatBatchResultPreview(
 	];
 
 	if (result.results.length > 0) {
-		lines.push(`actions: ${result.results.map(formatActionSummary).join("  ")}`);
+		lines.push("actions:");
+		for (const actionResult of result.results) {
+			lines.push(`  ${formatActionSummary(actionResult)}`);
+		}
 	}
 
 	const hints = buildBatchContinuationHints(result, options);
