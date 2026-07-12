@@ -281,6 +281,14 @@ describe("resolveBatchQueueConfig precedence", () => {
 		expect(resolved.allowObjectiveMutations).toBe(false);
 	});
 
+	it("defaults groundingTurns to 3 and prefers env over file config", () => {
+		delete process.env.BATCH_QUEUE_GROUNDING_TURNS;
+		expect(resolveBatchQueueConfig().groundingTurns).toBe(3);
+		process.env.BATCH_QUEUE_GROUNDING_TURNS = "0";
+		expect(resolveBatchQueueConfig({}, { groundingTurns: 5 }).groundingTurns).toBe(0);
+		delete process.env.BATCH_QUEUE_GROUNDING_TURNS;
+	});
+
 	it("prefers env objective mutation flag over file config", () => {
 		process.env.BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS = "true";
 		const resolved = resolveBatchQueueConfig({}, {

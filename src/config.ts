@@ -43,6 +43,11 @@ export interface BatchQueueConfig {
 	 */
 	executorThinking?: ExecutorThinkingLevel;
 	/**
+	 * How many read/grep grounding turns the planner may take before it must
+	 * submit a batch. 0 = plan blind in one shot (old behavior). Default: 3.
+	 */
+	groundingTurns?: number;
+	/**
 	 * Whether objective-planned batches may include mutating actions such as
 	 * apply_diff. Direct `actions` batches are always allowed to include them.
 	 * Default: false.
@@ -60,6 +65,7 @@ export interface ResolvedBatchQueueConfig {
 	 */
 	readonly executorModel?: ModelRef;
 	readonly executorThinking?: ExecutorThinkingLevel;
+	readonly groundingTurns: number;
 	readonly allowObjectiveMutations: boolean;
 	readonly pathSecurity: PathSecurityConfig;
 }
@@ -69,6 +75,8 @@ const ENV_EXECUTOR = "BATCH_QUEUE_EXECUTOR";
 const ENV_EXECUTOR_PROVIDER = "BATCH_QUEUE_EXECUTOR_PROVIDER";
 const ENV_EXECUTOR_MODEL = "BATCH_QUEUE_EXECUTOR_MODEL";
 const ENV_EXECUTOR_THINKING = "BATCH_QUEUE_EXECUTOR_THINKING";
+const ENV_GROUNDING_TURNS = "BATCH_QUEUE_GROUNDING_TURNS";
+const DEFAULT_GROUNDING_TURNS = 3;
 const ENV_ALLOW_OBJECTIVE_MUTATIONS = "BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS";
 
 function parsePositiveInt(value: string | undefined): number | undefined {
@@ -97,6 +105,13 @@ function parseExecutorFromEnv(): ModelRef | undefined {
 		return { provider, id };
 	}
 	return undefined;
+}
+
+function parseNonNegativeInt(value: string | undefined): number | undefined {
+	if (!value) return undefined;
+	const parsed = Number.parseInt(value, 10);
+	if (!Number.isFinite(parsed) || parsed < 0) return undefined;
+	return parsed;
 }
 
 function parseBooleanEnv(value: string | undefined): boolean | undefined {
@@ -137,8 +152,15 @@ export function resolveBatchQueueConfig(
 		parseExecutorThinking(process.env[ENV_EXECUTOR_THINKING]) ??
 		fileConfig.executorThinking;
 
+	const groundingTurns =
+		overrides.groundingTurns ??
+		parseNonNegativeInt(process.env[ENV_GROUNDING_TURNS]) ??
+		fileConfig.groundingTurns ??
+		DEFAULT_GROUNDING_TURNS;
+
 	return {
 		maxBatchActions,
+		groundingTurns: Math.max(0, groundingTurns),
 		...(executorModel ? { executorModel } : {}),
 		...(executorThinking ? { executorThinking } : {}),
 		allowObjectiveMutations:

@@ -6,9 +6,18 @@ import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import type { ActionBatchPayload } from "./payload.js";
 import type { ResolvedBatchQueueConfig } from "./config.js";
-import { createSubmitActionBatchToolSchema, QueueActionSchema } from "./schemas.js";
+import {
+	createSubmitActionBatchToolSchema,
+	GrepPatternActionSchema,
+	ReadLinesActionSchema,
+	QueueActionSchema,
+} from "./schemas.js";
 import { parseActionBatchPayload } from "./guards.js";
 import { resolvePlanningModelRef } from "./planning-model.js";
+import { executeReadLines } from "./executors/read-lines.js";
+import { executeGrepPattern } from "./executors/grep-pattern.js";
+import { DEFAULT_OUTPUT_LIMITS, DEFAULT_COMMAND_TIMEOUT_MS } from "./constants.js";
+import { findWorkspaceRoot } from "./lib/path-security.js";
 
 /** @deprecated Pass ModelRegistry directly to analyzeBatchObjective. */
 export type BatchAnalyzerContext = ModelRegistry;
@@ -92,10 +101,19 @@ export function analyzerSystemPrompt(config: ResolvedBatchQueueConfig): string {
 			"Do not plan mutating actions. Objective mode is read/check-only; omit apply_diff.",
 		];
 
+	const groundingGuidance =
+		config.groundingTurns > 0
+			? [
+				`Ground before planning: you may call inspect_read and inspect_grep up to ${config.groundingTurns} times to look at the real repo first.`,
+				"Inspect only enough to plan accurately, then call submit_action_batch. Do not inspect once you have enough context.",
+			]
+			: [];
+
 	return [
 		"You are the batch planner for a coding agent.",
 		"Given an objective, emit a sequential action batch as JSON via the submit_action_batch tool.",
-		"Plan up to the configured maximum of low-risk sequential repo actions for inspect/search/check loops whenever possible.",
+		...groundingGuidance,
+		"Plan the smallest batch that accomplishes the objective. Prefer short batches (3-5 actions) so the agent re-observes and adapts; only plan more when the extra steps are clearly needed.",
 		"Use deterministic actions: read/grep before shell.",
 		...mutationGuidance,
 		"Do not plan destructive, long-running, interactive, or approval-sensitive commands.",
@@ -116,6 +134,50 @@ function buildSubmitBatchTool(config: ResolvedBatchQueueConfig): Tool {
 			allowMutatingActions: config.allowObjectiveMutations,
 		}),
 	};
+}
+
+const INSPECT_READ_TOOL: Tool = {
+	name: "inspect_read",
+	description: "Read lines from a repo file to ground your plan. Does not execute the batch.",
+	parameters: ReadLinesActionSchema,
+};
+
+const INSPECT_GREP_TOOL: Tool = {
+	name: "inspect_grep",
+	description: "Search the repo with ripgrep to ground your plan. Does not execute the batch.",
+	parameters: GrepPatternActionSchema,
+};
+
+/** Runs a read/grep inspect tool call against the real workspace, read-only. */
+async function runInspectTool(
+	name: string,
+	args: Record<string, unknown>,
+	cwd: string,
+): Promise<string> {
+	const gitRoot = findWorkspaceRoot(cwd);
+	if (name === "inspect_read") {
+		const result = executeReadLines(
+			{ type: "read_lines", path: String(args.path ?? ""), startLine: args.startLine as number | undefined, endLine: args.endLine as number | undefined },
+			0,
+			{ workspaceRoot: cwd, gitWorkspaceRoot: gitRoot, limits: DEFAULT_OUTPUT_LIMITS },
+		);
+		return result.success ? result.formatted || "(empty)" : `error: ${result.error}`;
+	}
+	const result = await executeGrepPattern(
+		{
+			type: "grep_pattern",
+			pattern: String(args.pattern ?? ""),
+			path: args.path as string | undefined,
+			glob: args.glob as string | undefined,
+			caseSensitive: args.caseSensitive as boolean | undefined,
+			literal: args.literal as boolean | undefined,
+			contextLines: args.contextLines as number | undefined,
+		},
+		0,
+		{ workspaceRoot: cwd, gitWorkspaceRoot: gitRoot, limits: DEFAULT_OUTPUT_LIMITS, defaultTimeoutMs: DEFAULT_COMMAND_TIMEOUT_MS },
+	);
+	if (!result.success) return `error: ${result.error}`;
+	return result.matches.map((m) => `${m.path}:${m.lineNumber}: ${m.text}`).join("\n") || "(no matches)";
 }
 
 function extractBatchFromResponse(
@@ -158,6 +220,7 @@ export async function analyzeBatchObjective(
 	driverModel: Model<Api>,
 	modelRegistry: ModelRegistry,
 	config: ResolvedBatchQueueConfig,
+	cwd: string,
 	signal?: AbortSignal,
 ): Promise<ActionBatchPayload> {
 	const planningRef = resolvePlanningModelRef(
@@ -179,39 +242,98 @@ export async function analyzeBatchObjective(
 	if (!auth.ok) {
 		throw new Error(auth.error);
 	}
-	const userMessage: Message = {
-		role: "user",
-		content: [{ type: "text", text: objective }],
-		timestamp: Date.now(),
-	};
-
 	const complete = await resolveCompleteImplementation();
-	const response = await complete(
-		planningModel,
-		{
-			systemPrompt: analyzerSystemPrompt(config),
-			messages: [userMessage],
-			tools: [buildSubmitBatchTool(config)],
-		},
-		{
-			apiKey: auth.apiKey,
-			headers: auth.headers,
-			signal,
-			toolChoice: "any",
-			...(config.executorThinking ? { reasoningEffort: config.executorThinking } : {}),
-		},
-	);
+	return planBatchWithGrounding({
+		objective,
+		config,
+		cwd,
+		complete: (context, options) => complete(planningModel, context, { apiKey: auth.apiKey, headers: auth.headers, ...options }),
+		runInspect: (name, args) => runInspectTool(name, args, cwd),
+		signal,
+	});
+}
 
-	if (response.stopReason === "aborted") {
-		throw new Error("batch analysis aborted");
-	}
-	if (response.stopReason === "error") {
-		throw new Error(response.errorMessage ?? "planning model request failed");
+export interface PlanBatchDeps {
+	readonly objective: string;
+	readonly config: ResolvedBatchQueueConfig;
+	readonly cwd: string;
+	readonly complete: (
+		context: { systemPrompt: string; messages: readonly Message[]; tools: readonly Tool[] },
+		options: { signal?: AbortSignal; toolChoice?: string; reasoningEffort?: string },
+	) => Promise<CompleteResponse>;
+	readonly runInspect: (name: string, args: Record<string, unknown>) => Promise<string>;
+	readonly signal?: AbortSignal;
+}
+
+/**
+ * Plans a batch, optionally letting the model ground itself with read/grep
+ * inspect calls before it must submit. Pure w.r.t. IO: `complete` and
+ * `runInspect` are injected so this is unit-testable.
+ */
+export async function planBatchWithGrounding(deps: PlanBatchDeps): Promise<ActionBatchPayload> {
+	const { objective, config, complete, runInspect, signal } = deps;
+	const submitTool = buildSubmitBatchTool(config);
+	const grounding = config.groundingTurns > 0;
+	const tools: Tool[] = grounding
+		? [INSPECT_READ_TOOL, INSPECT_GREP_TOOL, submitTool]
+		: [submitTool];
+
+	const messages: Message[] = [
+		{ role: "user", content: [{ type: "text", text: objective }], timestamp: Date.now() },
+	];
+
+	const systemPrompt = analyzerSystemPrompt(config);
+	// One request per grounding turn, plus a final forced submit.
+	for (let turn = 0; turn <= config.groundingTurns; turn += 1) {
+		const lastTurn = turn === config.groundingTurns;
+		const response = await complete(
+			{ systemPrompt, messages, tools: lastTurn ? [submitTool] : tools },
+			{
+				signal,
+				toolChoice: "any",
+				...(config.executorThinking ? { reasoningEffort: config.executorThinking } : {}),
+			},
+		);
+
+		if (response.stopReason === "aborted") {
+			throw new Error("batch analysis aborted");
+		}
+		if (response.stopReason === "error") {
+			throw new Error(response.errorMessage ?? "planning model request failed");
+		}
+
+		const toolCalls = response.content.filter(
+			(entry): entry is ToolCall => entry.type === "toolCall" && "name" in entry,
+		);
+		const submit = toolCalls.find((call) => call.name === "submit_action_batch");
+		if (submit) {
+			const payload = parseActionBatchPayload(submit.arguments, config.maxBatchActions);
+			assertObjectiveMutationPolicy(payload, config);
+			return payload;
+		}
+
+		const inspects = toolCalls.filter(
+			(call) => call.name === "inspect_read" || call.name === "inspect_grep",
+		);
+		if (inspects.length === 0) {
+			throw new Error("planning model did not return submit_action_batch");
+		}
+
+		messages.push({ role: "assistant", content: response.content } as Message);
+		for (const call of inspects) {
+			const text = await runInspect(call.name, call.arguments);
+			messages.push({
+				role: "toolResult",
+				toolCallId: call.id,
+				toolName: call.name,
+				content: [{ type: "text", text }],
+				isError: false,
+				timestamp: Date.now(),
+			} as Message);
+		}
 	}
 
-	const payload = extractBatchFromResponse(response, config.maxBatchActions);
-	assertObjectiveMutationPolicy(payload, config);
-	return payload;
+	throw new Error("planning model did not return submit_action_batch");
 }
 
 export function createBatchQueueToolParameters(maxBatchActions: number) {

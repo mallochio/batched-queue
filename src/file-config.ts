@@ -22,6 +22,7 @@ export interface BatchQueueJsonConfig {
 	readonly executorModel?: string | ModelRef;
 	readonly executionModel?: string | ModelRef;
 	readonly executorThinking?: ExecutorThinkingLevel;
+	readonly groundingTurns?: number;
 	readonly allowObjectiveMutations?: boolean;
 }
 
@@ -64,6 +65,10 @@ export function parseBatchQueueJsonConfig(raw: unknown): BatchQueueConfig {
 	const executorThinking = parseExecutorThinking(raw.executorThinking);
 	if (executorThinking) {
 		config.executorThinking = executorThinking;
+	}
+
+	if (typeof raw.groundingTurns === "number" && Number.isFinite(raw.groundingTurns) && raw.groundingTurns >= 0) {
+		config.groundingTurns = raw.groundingTurns;
 	}
 
 	if (typeof raw.allowObjectiveMutations === "boolean") {

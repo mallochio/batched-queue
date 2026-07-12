@@ -20,6 +20,7 @@ fs.writeFileSync(path.join(tmpDir, "hello.txt"), "hello world\n");
 const hooks = createBatchedQueuePluginHooks(
 	{
 		maxBatchActions: 5,
+		groundingTurns: 0,
 		allowObjectiveMutations: false,
 		pathSecurity: DEFAULT_PATH_SECURITY,
 	},

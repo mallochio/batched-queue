@@ -193,6 +193,7 @@ export function registerBatchedQueueExtension(
 							driverModel,
 							ctx.modelRegistry,
 							resolvedConfig,
+							ctx.cwd,
 							signal,
 						),
 				},
