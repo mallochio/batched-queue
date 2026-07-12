@@ -88,6 +88,44 @@ function formatActionResultLines(actionResult: BatchExecutionResult["results"][n
 	return lines;
 }
 
+export interface FormatBatchResultPreviewOptions extends FormatBatchResultOptions {
+	readonly expanded?: boolean;
+}
+
+function formatActionSummary(actionResult: BatchExecutionResult["results"][number]): string {
+	const status = actionResult.success ? "✓" : "✗";
+	const exit = actionResult.exitCode === 0 ? "" : ` exit=${actionResult.exitCode}`;
+	return `${status} [${actionResult.index}] ${actionResult.type}${exit}`;
+}
+
+export function formatBatchResultPreview(
+	result: BatchExecutionResult,
+	options: FormatBatchResultPreviewOptions = {},
+): string {
+	if (options.expanded) {
+		return formatBatchResult(result, options);
+	}
+
+	const lines = [
+		result.haltedPrematurely
+			? `✗ batch halted at action ${result.haltedAtIndex ?? "?"} (${result.haltReason})`
+			: "✓ batch completed",
+		`${result.completedCount}/${result.totalRequested} actions in ${result.durationMs}ms`,
+		`cwd: ${result.shellState.cwd}`,
+	];
+
+	if (result.results.length > 0) {
+		lines.push(`actions: ${result.results.map(formatActionSummary).join("  ")}`);
+	}
+
+	const hints = buildBatchContinuationHints(result, options);
+	if (hints.length > 0) {
+		lines.push(`next: ${hints[0]}`);
+	}
+
+	return lines.join("\n");
+}
+
 export function formatBatchResult(
 	result: BatchExecutionResult,
 	options: FormatBatchResultOptions = {},

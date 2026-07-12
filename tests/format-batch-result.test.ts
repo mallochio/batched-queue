@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { formatBatchResult, buildBatchContinuationHints } from "../src/format-batch-result";
+import {
+	formatBatchResult,
+	buildBatchContinuationHints,
+	formatBatchResultPreview,
+} from "../src/format-batch-result";
 import type { BatchExecutionResult } from "../src/results";
 
 function baseResult(overrides: Partial<BatchExecutionResult> = {}): BatchExecutionResult {
@@ -61,6 +65,30 @@ describe("buildBatchContinuationHints", () => {
 		const actionHints = buildBatchContinuationHints(baseResult(), { usedObjective: false });
 		expect(objectiveHints.some((hint) => hint.includes("refined objective"))).toBe(true);
 		expect(actionHints.some((hint) => hint.includes("explicit actions"))).toBe(true);
+	});
+	it("renders compact preview unless expanded", () => {
+		const result = baseResult({
+			results: [
+				{
+					index: 0,
+					type: "execute_bash",
+					success: true,
+					exitCode: 0,
+					durationMs: 1,
+					command: "printf ok",
+					stdout: { text: "ok" },
+					stderr: { text: "" },
+				},
+			],
+		});
+
+		const compact = formatBatchResultPreview(result);
+		expect(compact).toContain("✓ batch completed");
+		expect(compact).toContain("actions: ✓ [0] execute_bash");
+		expect(compact).not.toContain("stdout:");
+
+		const expanded = formatBatchResultPreview(result, { expanded: true });
+		expect(expanded).toContain("stdout:");
 	});
 });
 

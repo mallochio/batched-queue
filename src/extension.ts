@@ -30,6 +30,7 @@ import {
 } from "./execute-batch-queue";
 import { resolvePlanningModelRef } from "./planning-model";
 import { buildBatchQueueDescription } from "./tool-description";
+import { formatBatchResultPreview } from "./format-batch-result";
 
 interface BatchQueueToolDetails {
 	readonly driverModel: { readonly provider: string; readonly id: string };
@@ -82,26 +83,47 @@ export function registerBatchedQueueExtension(
 
 		parameters: createBatchQueueToolParameters(resolvedConfig.maxBatchActions),
 
-		renderCall(args, theme) {
+		renderCall(args, theme, context) {
+			const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
 			if (args.actions?.length) {
-				return new Text(
-					theme.fg("toolTitle", theme.bold(`batch_queue (${args.actions.length} actions)`)),
-					0,
-					0,
+				const actionTypes = args.actions
+					.map((action: { type?: string }) => action.type ?? "?")
+					.join(" → ");
+				text.setText(
+					theme.fg("toolTitle", theme.bold("batch_queue")) +
+						theme.fg("toolOutput", ` ${args.actions.length} actions: ${actionTypes}`),
 				);
+				return text;
 			}
 			const preview = (args.objective ?? "").split("\n")[0].slice(0, 80);
-			return new Text(
-				theme.fg("toolTitle", theme.bold(`batch_queue: ${preview || "..."}`)),
-				0,
-				0,
+			text.setText(
+				theme.fg("toolTitle", theme.bold("batch_queue")) +
+					theme.fg("toolOutput", ` objective: ${preview || "..."}`),
 			);
+			return text;
 		},
 
-		renderResult(result, _opts, theme) {
+		renderResult(result, opts, theme, context) {
+			const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
+			const details = result.details as BatchQueueToolDetails | BatchQueueToolErrorDetails | undefined;
+			if (details && "result" in details) {
+				const rendered = formatBatchResultPreview(details.result, { expanded: opts.expanded });
+				text.setText(
+					rendered
+						.split("\n")
+						.map((line, index) =>
+							index === 0
+								? theme.fg(context.isError ? "error" : "success", line)
+								: theme.fg(line.startsWith("next:") ? "muted" : "toolOutput", line),
+						)
+						.join("\n"),
+				);
+				return text;
+			}
+
 			const content = result.content[0];
-			const text = content?.type === "text" ? content.text : "";
-			return new Text(theme.fg("toolOutput", text), 0, 0);
+			text.setText(theme.fg(context.isError ? "error" : "toolOutput", content?.type === "text" ? content.text : ""));
+			return text;
 		},
 
 		async execute(_toolCallId, params, signal, _onUpdate, ctx) {
