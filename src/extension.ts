@@ -78,7 +78,7 @@ export function registerBatchedQueueExtension(
 			"Use explicit `actions` only for 2+ exact ordered actions, apply_diff/mutations, or continuing after a failed batch.",
 			"Objective mode is read/check-only by default; use explicit actions for mutations unless objective mutations are enabled.",
 			"After a batch completes, read the next-steps hints and call batch_queue again if the task is not finished.",
-			"Do not use batch_queue for long-running, interactive, destructive, or approval-sensitive commands.",
+			"Keep each batched action a short, non-interactive command; route long-running, interactive, or approval-sensitive commands through the normal tools.",
 		],
 		executionMode: "sequential",
 
