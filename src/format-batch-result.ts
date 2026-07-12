@@ -42,7 +42,7 @@ export function buildBatchContinuationHints(
 		);
 	} else {
 		hints.push(
-			"If more sequential steps remain, call batch_queue again with explicit actions (preferred) or a follow-up objective.",
+			"If more sequential steps remain, call batch_queue again with a follow-up objective (preferred) or explicit actions when exact steps are required.",
 		);
 	}
 

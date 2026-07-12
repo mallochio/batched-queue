@@ -71,13 +71,13 @@ export function registerBatchedQueueExtension(
 		label: "Batch Queue",
 		description,
 		promptSnippet:
-			"Batch up to 10 safe sequential repo actions: read, grep, short bash, or targeted diff",
+			"Batch repo work by describing an objective; the tool plans and runs safe sequential read/grep/bash actions.",
 		promptGuidelines: [
-			"RGB-style loop: plan explicit batch_queue actions, execute with zero per-action LLM calls, then replan when results change or more steps remain.",
-			"Prefer explicit batch_queue actions when the exact steps are known, especially for apply_diff.",
-			"Use batch_queue objective only when the goal is clear but enumerating steps is tedious; the session driver plans by default.",
+			"Prefer batch_queue with `objective` for multi-step repo inspection, verification, and read/check workflows.",
+			"Use explicit `actions` only when exact ordered commands/paths are already known, or when apply_diff is required.",
+			"Objective mode is read/check-only by default; use explicit actions for mutations unless objective mutations are enabled.",
 			"After a batch completes, read the next-steps hints and call batch_queue again if the task is not finished.",
-			"Do not use batch_queue for long-running, interactive, destructive, or judgment-dependent steps.",
+			"Do not use batch_queue for long-running, interactive, destructive, or approval-sensitive commands.",
 		],
 		executionMode: "sequential",
 

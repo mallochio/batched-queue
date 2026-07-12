@@ -219,7 +219,7 @@ export function createBatchQueueToolParameters(maxBatchActions: number) {
 		objective: Type.Optional(
 			Type.String({
 				description:
-					"Use when the goal is clear but enumerating steps is tedious; the session driver plans by default, or a configured cheap execution model when set.",
+					"Default mode. Describe the multi-step repo task; batch_queue plans and runs a safe sequential read/check action batch.",
 			}),
 		),
 		actions: Type.Optional(
@@ -227,7 +227,7 @@ export function createBatchQueueToolParameters(maxBatchActions: number) {
 				minItems: 1,
 				maxItems: maxBatchActions,
 				description:
-					"Pre-planned action batch from the session driver / planner. Preferred when the exact deterministic reads, searches, checks, or edits are already known; skips objective planning.",
+					"Advanced escape hatch. Use only when exact ordered actions are already known or mutation/apply_diff is required; skips objective planning.",
 			}),
 		),
 		batchId: Type.Optional(
