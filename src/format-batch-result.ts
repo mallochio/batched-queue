@@ -125,6 +125,50 @@ function formatActionSummary(actionResult: BatchExecutionResult["results"][numbe
 	return `${status} ${String(actionResult.index).padStart(2, " ")} ${formatActionLabel(actionResult).padEnd(5)} ${formatActionTarget(actionResult)}${exit}`;
 }
 
+function codeBlock(code: string, lang = ""): string {
+	return `\`\`\`\`${lang}\n${code}\n\`\`\`\``;
+}
+
+function formatActionMarkdown(actionResult: BatchExecutionResult["results"][number]): string[] {
+	const status = actionResult.success ? "✓" : "✗";
+	const exit = actionResult.exitCode === 0 ? "" : ` exit=${actionResult.exitCode}`;
+	const label = `[${status} ${String(actionResult.index).padStart(2, " ")} ${formatActionLabel(actionResult)}${exit}]`;
+
+	return matchActionExecutionResult(actionResult, {
+		read_lines: (result) => [label, codeBlock(result.path + (result.requestedRange ? `:${result.requestedRange.startLine}-${result.requestedRange.endLine}` : ""))],
+		grep_pattern: (result) => [label, codeBlock(`/${oneLine(result.pattern)}/ (${result.matchCount} matches)`) ],
+		execute_bash: (result) => [label, codeBlock(result.command, "bash")],
+		apply_diff: (result) => [label, codeBlock(`${result.path} (${result.applied ? "applied" : "not applied"})`)],
+	});
+}
+
+export function formatBatchResultMarkdownPreview(
+	result: BatchExecutionResult,
+	options: FormatBatchResultOptions = {},
+): string {
+	const lines = [
+		result.haltedPrematurely
+			? `**✗ batch halted at action ${result.haltedAtIndex ?? "?"} (${result.haltReason})**`
+			: "**✓ batch completed**",
+		`${result.completedCount}/${result.totalRequested} actions · ${result.durationMs}ms`,
+		`cwd: \`${result.shellState.cwd}\``,
+	];
+
+	if (result.results.length > 0) {
+		lines.push("", "**executed actions**");
+		for (const actionResult of result.results) {
+			lines.push("", ...formatActionMarkdown(actionResult));
+		}
+	}
+
+	const hints = buildBatchContinuationHints(result, options);
+	if (hints.length > 0) {
+		lines.push("", `> next: ${hints[0]}`);
+	}
+
+	return lines.join("\n");
+}
+
 export function formatBatchResultPreview(
 	result: BatchExecutionResult,
 	options: FormatBatchResultPreviewOptions = {},

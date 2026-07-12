@@ -12,8 +12,8 @@
  */
 
 import type { Api, Model } from "@earendil-works/pi-ai";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
+import { getMarkdownTheme, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Markdown, Text } from "@earendil-works/pi-tui";
 import {
 	type BatchQueueConfig,
 	resolveBatchQueueConfig,
@@ -30,7 +30,7 @@ import {
 } from "./execute-batch-queue";
 import { resolvePlanningModelRef } from "./planning-model";
 import { buildBatchQueueDescription } from "./tool-description";
-import { formatBatchResultPreview } from "./format-batch-result";
+import { formatBatchResultMarkdownPreview } from "./format-batch-result";
 
 interface BatchQueueToolDetails {
 	readonly driverModel: { readonly provider: string; readonly id: string };
@@ -110,23 +110,18 @@ export function registerBatchedQueueExtension(
 		},
 
 		renderResult(result, opts, theme, context) {
-			const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
 			const details = result.details as BatchQueueToolDetails | BatchQueueToolErrorDetails | undefined;
 			if (details && "result" in details) {
-				const rendered = formatBatchResultPreview(details.result, { expanded: opts.expanded });
-				text.setText(
-					rendered
-						.split("\n")
-						.map((line, index) =>
-							index === 0
-								? theme.fg(context.isError ? "error" : "success", line)
-								: theme.fg(line.startsWith("next:") ? "muted" : "toolOutput", line),
-						)
-						.join("\n"),
+				const markdown = (context.lastComponent as Markdown | undefined) ?? new Markdown("", 0, 0, getMarkdownTheme());
+				markdown.setText(
+					formatBatchResultMarkdownPreview(details.result, {
+						usedObjective: Boolean(context.args?.objective?.trim()) && !context.args?.actions?.length,
+					}),
 				);
-				return text;
+				return markdown;
 			}
 
+			const text = (context.lastComponent as Text | undefined) ?? new Text("", 0, 0);
 			const content = result.content[0];
 			text.setText(theme.fg(context.isError ? "error" : "toolOutput", content?.type === "text" ? content.text : ""));
 			return text;
