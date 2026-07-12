@@ -48,7 +48,7 @@ if (registeredTool.definition.executionMode !== "sequential") {
 	process.exit(1);
 }
 
-if (!registeredTool.definition.promptSnippet?.includes("Batch")) {
+if (!registeredTool.definition.promptSnippet?.includes("batch_queue")) {
 	console.error("batch_queue promptSnippet missing");
 	process.exit(1);
 }
