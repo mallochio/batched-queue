@@ -67,6 +67,7 @@ describe("buildBatchContinuationHints", () => {
 		expect(actionHints.some((hint) => hint.includes("explicit actions"))).toBe(true);
 	});
 	it("renders compact preview unless expanded", () => {
+		const longCommand = "printf 'this is a deliberately long command that should remain fully visible in the compact native renderer'";
 		const result = baseResult({
 			results: [
 				{
@@ -75,7 +76,7 @@ describe("buildBatchContinuationHints", () => {
 					success: true,
 					exitCode: 0,
 					durationMs: 1,
-					command: "printf ok",
+					command: longCommand,
 					stdout: { text: "ok" },
 					stderr: { text: "" },
 				},
@@ -84,7 +85,8 @@ describe("buildBatchContinuationHints", () => {
 
 		const compact = formatBatchResultPreview(result);
 		expect(compact).toContain("✓ batch completed");
-		expect(compact).toContain("actions:\n  ✓  0 bash  printf ok");
+		expect(compact).toContain(`actions:\n  ✓  0 bash  ${longCommand}`);
+		expect(compact).not.toContain("…");
 		expect(compact).not.toContain("stdout:");
 
 		const expanded = formatBatchResultPreview(result, { expanded: true });

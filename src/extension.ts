@@ -90,7 +90,7 @@ export function registerBatchedQueueExtension(
 					.map((action: { type?: string; path?: string; command?: string; pattern?: string }) => {
 						const target = action.command ?? action.path ?? action.pattern;
 						const label = target
-							? `${action.type ?? "?"}: ${target.replace(/\s+/g, " ").trim().slice(0, 50)}`
+							? `${action.type ?? "?"}: ${target.replace(/\s+/g, " ").trim()}`
 							: action.type ?? "?";
 						return label;
 					})
@@ -101,10 +101,10 @@ export function registerBatchedQueueExtension(
 				);
 				return text;
 			}
-			const preview = (args.objective ?? "").split("\n")[0].slice(0, 80);
+			const objective = (args.objective ?? "").trim();
 			text.setText(
 				theme.fg("toolTitle", theme.bold("batch_queue")) +
-					theme.fg("toolOutput", ` objective: ${preview || "..."}`),
+					theme.fg("toolOutput", ` objective: ${objective || "..."}`),
 			);
 			return text;
 		},

@@ -92,9 +92,8 @@ export interface FormatBatchResultPreviewOptions extends FormatBatchResultOption
 	readonly expanded?: boolean;
 }
 
-function oneLine(text: string, maxLength = 80): string {
-	const normalized = text.replace(/\s+/g, " ").trim();
-	return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 1)}…` : normalized;
+function oneLine(text: string): string {
+	return text.replace(/\s+/g, " ").trim();
 }
 
 function formatActionTarget(actionResult: BatchExecutionResult["results"][number]): string {
@@ -105,7 +104,7 @@ function formatActionTarget(actionResult: BatchExecutionResult["results"][number
 				: "";
 			return `${result.path}${range}`;
 		},
-		grep_pattern: (result) => `/${oneLine(result.pattern, 40)}/ (${result.matchCount} matches)`,
+		grep_pattern: (result) => `/${oneLine(result.pattern)}/ (${result.matchCount} matches)`,
 		execute_bash: (result) => oneLine(result.command),
 		apply_diff: (result) => `${result.path} (${result.applied ? "applied" : "not applied"})`,
 	});
