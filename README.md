@@ -187,6 +187,15 @@ Use `actions` when you already know the exact deterministic steps, especially fo
 
 Prefer `multi_tool_use.parallel` instead for independent parallel reads/searches. Do not use `batch_queue` for destructive, long-running, interactive, or approval-sensitive commands. File actions are workspace-scoped unless configured otherwise.
 
+## Research inspirations
+
+Recent planning features are inspired by two 2026 arXiv papers surfaced via alphaXiv trending papers:
+
+- [**Metacognition in LLMs: Foundations, Progress, and Opportunities**](https://arxiv.org/abs/2607.11881) motivates planner self-check metadata. Objective-planned batches can attach a `reflection` object with confidence, success criteria, risks, and fallback guidance so the driver can see how certain the planner was.
+- [**Function-Aware Fill-in-the-Middle as Mid-Training for Coding Agent Foundation Models**](https://arxiv.org/abs/2607.12463) observes that an agent action-observation-continuation loop resembles a function call whose return value is consumed downstream. `batch_queue` mirrors that idea with `bindTo` result bindings and `${name}` references between sequential actions.
+
+These papers are not dependencies or implementations; they are design inspiration for making batched planning more explicit, inspectable, and compositional.
+
 ## Manage install
 
 ```bash
