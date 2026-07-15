@@ -109,6 +109,7 @@ export async function executeBatchQueue(options: {
 	const usedObjective = Boolean(params.objective?.trim()) && !(params.actions && params.actions.length > 0);
 	const text = formatBatchResult(result, {
 		rationale: payload.rationale,
+		reflection: payload.reflection,
 		usedObjective,
 	});
 

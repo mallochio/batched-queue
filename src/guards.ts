@@ -57,6 +57,7 @@ export function parseActionBatchPayload(
 		actions: value.actions,
 		batchId: value.batchId,
 		rationale: value.rationale,
+		reflection: value.reflection,
 	};
 }
 

@@ -48,6 +48,12 @@ export interface BatchQueueConfig {
 	 */
 	groundingTurns?: number;
 	/**
+	 * Ask objective planners to attach a structured confidence/risk reflection
+	 * to submitted batches. This is advisory metadata for the driver and result
+	 * hints; it does not add another model call. Default: true.
+	 */
+	requirePlanReflection?: boolean;
+	/**
 	 * Whether objective-planned batches may include mutating actions such as
 	 * apply_diff. Direct `actions` batches are always allowed to include them.
 	 * Default: false.
@@ -66,6 +72,7 @@ export interface ResolvedBatchQueueConfig {
 	readonly executorModel?: ModelRef;
 	readonly executorThinking?: ExecutorThinkingLevel;
 	readonly groundingTurns: number;
+	readonly requirePlanReflection: boolean;
 	readonly allowObjectiveMutations: boolean;
 	readonly pathSecurity: PathSecurityConfig;
 }
@@ -76,7 +83,9 @@ const ENV_EXECUTOR_PROVIDER = "BATCH_QUEUE_EXECUTOR_PROVIDER";
 const ENV_EXECUTOR_MODEL = "BATCH_QUEUE_EXECUTOR_MODEL";
 const ENV_EXECUTOR_THINKING = "BATCH_QUEUE_EXECUTOR_THINKING";
 const ENV_GROUNDING_TURNS = "BATCH_QUEUE_GROUNDING_TURNS";
+const ENV_REQUIRE_PLAN_REFLECTION = "BATCH_QUEUE_REQUIRE_PLAN_REFLECTION";
 const DEFAULT_GROUNDING_TURNS = 3;
+const DEFAULT_REQUIRE_PLAN_REFLECTION = true;
 const ENV_ALLOW_OBJECTIVE_MUTATIONS = "BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS";
 
 function parsePositiveInt(value: string | undefined): number | undefined {
@@ -163,6 +172,11 @@ export function resolveBatchQueueConfig(
 		groundingTurns: Math.max(0, groundingTurns),
 		...(executorModel ? { executorModel } : {}),
 		...(executorThinking ? { executorThinking } : {}),
+		requirePlanReflection:
+			overrides.requirePlanReflection ??
+			parseBooleanEnv(process.env[ENV_REQUIRE_PLAN_REFLECTION]) ??
+			fileConfig.requirePlanReflection ??
+			DEFAULT_REQUIRE_PLAN_REFLECTION,
 		allowObjectiveMutations:
 			overrides.allowObjectiveMutations ??
 			parseBooleanEnv(process.env[ENV_ALLOW_OBJECTIVE_MUTATIONS]) ??

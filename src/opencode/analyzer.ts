@@ -98,7 +98,7 @@ function buildObjectivePrompt(objective: string, config: ResolvedBatchQueueConfi
 		"",
 		`Objective:\n${objective}`,
 		"",
-		'Return ONLY a JSON object shaped like {"actions":[...],"rationale":"..."}.',
+		'Return ONLY a JSON object shaped like {"actions":[...],"rationale":"...","reflection":{"confidence":0.8,"successCriteria":"...","risks":["..."],"fallback":"..."}}.',
 	].join("\n");
 }
 

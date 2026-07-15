@@ -1,6 +1,8 @@
 {
   "executionModel": "openai/gpt-5.4-nano",
   "executorThinking": "high",
+  "groundingTurns": 3,
+  "requirePlanReflection": true,
   "maxBatchActions": 10,
   "allowObjectiveMutations": false
 }

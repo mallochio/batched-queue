@@ -32,6 +32,12 @@ describe("parseBatchQueueJsonConfig", () => {
 		});
 	});
 
+	it("parses requirePlanReflection", () => {
+		expect(parseBatchQueueJsonConfig({ requirePlanReflection: false })).toEqual({
+			requirePlanReflection: false,
+		});
+	});
+
 	it("parses allowObjectiveMutations", () => {
 		expect(parseBatchQueueJsonConfig({ allowObjectiveMutations: true })).toEqual({
 			allowObjectiveMutations: true,
@@ -203,6 +209,7 @@ describe("resolveBatchQueueConfig precedence", () => {
 	const savedExecutor = process.env.BATCH_QUEUE_EXECUTOR;
 	const savedExecutorThinking = process.env.BATCH_QUEUE_EXECUTOR_THINKING;
 	const savedMaxActions = process.env.BATCH_QUEUE_MAX_ACTIONS;
+	const savedRequirePlanReflection = process.env.BATCH_QUEUE_REQUIRE_PLAN_REFLECTION;
 	const savedAllowObjectiveMutations = process.env.BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS;
 
 	afterEach(() => {
@@ -220,6 +227,11 @@ describe("resolveBatchQueueConfig precedence", () => {
 			delete process.env.BATCH_QUEUE_MAX_ACTIONS;
 		} else {
 			process.env.BATCH_QUEUE_MAX_ACTIONS = savedMaxActions;
+		}
+		if (savedRequirePlanReflection === undefined) {
+			delete process.env.BATCH_QUEUE_REQUIRE_PLAN_REFLECTION;
+		} else {
+			process.env.BATCH_QUEUE_REQUIRE_PLAN_REFLECTION = savedRequirePlanReflection;
 		}
 		if (savedAllowObjectiveMutations === undefined) {
 			delete process.env.BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS;
@@ -273,6 +285,18 @@ describe("resolveBatchQueueConfig precedence", () => {
 		delete process.env.BATCH_QUEUE_MAX_ACTIONS;
 		const resolved = resolveBatchQueueConfig();
 		expect(resolved.maxBatchActions).toBe(10);
+	});
+
+	it("enables planner reflection by default", () => {
+		delete process.env.BATCH_QUEUE_REQUIRE_PLAN_REFLECTION;
+		const resolved = resolveBatchQueueConfig();
+		expect(resolved.requirePlanReflection).toBe(true);
+	});
+
+	it("lets env disable planner reflection", () => {
+		process.env.BATCH_QUEUE_REQUIRE_PLAN_REFLECTION = "false";
+		const resolved = resolveBatchQueueConfig({}, { requirePlanReflection: true });
+		expect(resolved.requirePlanReflection).toBe(false);
 	});
 
 	it("disables objective mutations by default", () => {

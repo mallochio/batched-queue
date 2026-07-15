@@ -55,6 +55,16 @@ export const QueueActionSchema = Type.Union([
 	ApplyDiffActionSchema,
 ]);
 
+export const PlanReflectionSchema = Type.Object(
+	{
+		confidence: Type.Number({ minimum: 0, maximum: 1 }),
+		successCriteria: Type.String({ minLength: 1 }),
+		risks: Type.Array(Type.String(), { default: [] }),
+		fallback: Type.Optional(Type.String()),
+	},
+	{ additionalProperties: false },
+);
+
 const ObjectiveQueueActionSchema = Type.Union([
 	ReadLinesActionSchema,
 	GrepPatternActionSchema,
@@ -74,6 +84,7 @@ export function createActionBatchPayloadSchema(maxBatchActions: number = DEFAULT
 			}),
 			batchId: Type.Optional(Type.String({ minLength: 1 })),
 			rationale: Type.Optional(Type.String()),
+			reflection: Type.Optional(PlanReflectionSchema),
 		},
 		{ additionalProperties: false },
 	);
@@ -253,6 +264,7 @@ export function createSubmitActionBatchToolSchema(
 			maxItems: maxBatchActions,
 		}),
 		rationale: Type.Optional(Type.String()),
+		reflection: Type.Optional(PlanReflectionSchema),
 	});
 }
 

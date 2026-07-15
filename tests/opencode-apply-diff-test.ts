@@ -21,6 +21,7 @@ const hooks = createBatchedQueuePluginHooks(
 	{
 		maxBatchActions: 5,
 		groundingTurns: 0,
+		requirePlanReflection: true,
 		allowObjectiveMutations: false,
 		pathSecurity: DEFAULT_PATH_SECURITY,
 	},

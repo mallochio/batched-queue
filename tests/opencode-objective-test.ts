@@ -49,6 +49,7 @@ const hooks = createBatchedQueuePluginHooks(
 	{
 		maxBatchActions: 5,
 		groundingTurns: 3, // default-like; OpenCode path must NOT advertise inspect tools
+		requirePlanReflection: true,
 		allowObjectiveMutations: false,
 		pathSecurity: DEFAULT_PATH_SECURITY,
 	},

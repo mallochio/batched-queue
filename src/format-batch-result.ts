@@ -1,8 +1,10 @@
 import { matchActionExecutionResult } from "./guards";
 import type { BatchExecutionResult } from "./results";
+import type { PlanReflection } from "./payload";
 
 export interface FormatBatchResultOptions {
 	readonly rationale?: string;
+	readonly reflection?: PlanReflection;
 	readonly usedObjective?: boolean;
 }
 
@@ -20,6 +22,14 @@ export function buildBatchContinuationHints(
 
 	if (options.rationale?.trim()) {
 		hints.push(`plan rationale: ${options.rationale.trim()}`);
+	}
+
+	if (options.reflection) {
+		const confidence = Math.round(options.reflection.confidence * 100);
+		hints.push(`planner confidence: ${confidence}% — ${options.reflection.successCriteria}`);
+		if (options.reflection.confidence < 0.7 && options.reflection.fallback?.trim()) {
+			hints.push(`low-confidence fallback: ${options.reflection.fallback.trim()}`);
+		}
 	}
 
 	if (result.haltedPrematurely) {
@@ -55,6 +65,20 @@ function codeFence(language: string, text: string): string[] {
 
 function collapsibleBlock(title: string, language: string, text: string): string[] {
 	return ["<details>", `<summary>${title}</summary>`, "", ...codeFence(language, text), "", "</details>"];
+}
+
+function formatPlanReflection(reflection: PlanReflection): string[] {
+	const lines = [
+		`- confidence: ${Math.round(reflection.confidence * 100)}%`,
+		`- success criteria: ${reflection.successCriteria}`,
+	];
+	if (reflection.risks.length > 0) {
+		lines.push(`- risks: ${reflection.risks.join("; ")}`);
+	}
+	if (reflection.fallback?.trim()) {
+		lines.push(`- fallback: ${reflection.fallback.trim()}`);
+	}
+	return lines;
 }
 
 function formatActionResultLines(actionResult: BatchExecutionResult["results"][number]): string[] {
@@ -187,6 +211,10 @@ export function formatBatchResult(
 	];
 
 	const hints = buildBatchContinuationHints(result, options);
+	if (options.reflection) {
+		lines.push("", "### Planner reflection", ...formatPlanReflection(options.reflection));
+	}
+
 	if (result.results.length > 0) {
 		lines.push("", "### Executed actions");
 		for (const actionResult of result.results) {

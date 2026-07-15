@@ -10,6 +10,7 @@ import { DEFAULT_PATH_SECURITY } from "../src/lib/path-security.ts";
 const args = createBatchQueueZodArgs({
 	maxBatchActions: 5,
 	groundingTurns: 0,
+	requirePlanReflection: true,
 	allowObjectiveMutations: false,
 	pathSecurity: DEFAULT_PATH_SECURITY,
 });

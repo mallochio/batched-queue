@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { planBatchWithGrounding, type PlanBatchDeps } from "../src/analyzer";
+import { analyzerSystemPrompt, planBatchWithGrounding, type PlanBatchDeps } from "../src/analyzer";
 import { resolveBatchQueueConfig } from "../src/config";
 
 function baseDeps(overrides: Partial<PlanBatchDeps> = {}): PlanBatchDeps {
@@ -46,6 +46,12 @@ describe("planBatchWithGrounding", () => {
 		expect(inspected).toEqual(['inspect_grep:{"pattern":"loadFileConfig"}']);
 		expect(payload.actions).toHaveLength(1);
 		expect(payload.actions[0]?.type).toBe("read_lines");
+	});
+
+	it("includes planner reflection guidance by default", () => {
+		const prompt = analyzerSystemPrompt(resolveBatchQueueConfig(), false);
+		expect(prompt).toContain("reflection");
+		expect(prompt).toContain("confidence");
 	});
 
 	it("forces submit-only tools on the final turn", async () => {

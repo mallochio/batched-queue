@@ -117,6 +117,13 @@ export function analyzerSystemPrompt(
 			]
 			: [];
 
+	const reflectionGuidance = config.requirePlanReflection
+		? [
+			"Attach a `reflection` object when submitting: confidence (0-1), successCriteria, risks, and optional fallback.",
+			"Use confidence below 0.7 when the objective is ambiguous or insufficiently grounded; in that case prefer a smaller read/check batch over speculative shell commands.",
+		]
+		: [];
+
 	return [
 		"You are the batch planner for a coding agent.",
 		"Given an objective, emit a sequential action batch as JSON via the submit_action_batch tool.",
@@ -131,6 +138,7 @@ export function analyzerSystemPrompt(
 		"- execute_bash: { type, command, timeoutMs? }",
 		"Order actions so each step can rely on prior shell state (cwd/env persist for execute_bash).",
 		"Keep batches concise and actionable; stop once enough context or verification is gathered.",
+		...reflectionGuidance,
 	].join("\n");
 }
 

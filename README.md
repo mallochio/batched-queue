@@ -114,12 +114,13 @@ Project-local config in `.pi/batched-queue.json`:
   "executionModel": "openai/gpt-5.4-nano",
   "executorThinking": "high",
   "groundingTurns": 3,
+  "requirePlanReflection": true,
   "maxBatchActions": 10,
   "allowObjectiveMutations": false
 }
 ```
 
-`executionModel` (alias: `executorModel`) accepts either `provider/model` shorthand or `{ "provider": "...", "id": "..." }`. When unset, objective batches use your session driver / planner model. `executorThinking` is optional (`minimal`, `low`, `medium`, `high`, `xhigh`) and is forwarded best-effort as Pi `reasoningEffort` or OpenCode prompt `variant`. `groundingTurns` (default `3`) lets the objective planner read/grep the real repo before it plans; set `0` to plan blind in one shot (Pi objective mode only).
+`executionModel` (alias: `executorModel`) accepts either `provider/model` shorthand or `{ "provider": "...", "id": "..." }`. When unset, objective batches use your session driver / planner model. `executorThinking` is optional (`minimal`, `low`, `medium`, `high`, `xhigh`) and is forwarded best-effort as Pi `reasoningEffort` or OpenCode prompt `variant`. `groundingTurns` (default `3`) lets the objective planner read/grep the real repo before it plans; set `0` to plan blind in one shot (Pi objective mode only). `requirePlanReflection` (default `true`) asks objective planners to attach structured confidence, success criteria, risks, and fallback metadata to submitted batches.
 
 Package defaults can live in `package.json`:
 
@@ -147,6 +148,7 @@ Optional environment variables:
 - `BATCH_QUEUE_EXECUTOR_MODEL`: execution model id when set separately
 - `BATCH_QUEUE_EXECUTOR_THINKING`: optional reasoning/thinking effort (`minimal`, `low`, `medium`, `high`, `xhigh`)
 - `BATCH_QUEUE_GROUNDING_TURNS`: read/grep grounding turns before the planner must submit, default `3` (`0` = plan blind)
+- `BATCH_QUEUE_REQUIRE_PLAN_REFLECTION`: set to `false` to stop asking objective planners for confidence/risk reflection metadata
 - `BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS`: set to `true` to let objective-planned batches include `apply_diff`
 
 The planner / driver model is always your main session model. An optional cheap execution model converts `objective` inputs into action batches; when unset, the session driver plans. Prefer explicit `actions` from the driver for edits. Objective-planned batches are read/check-only by default.

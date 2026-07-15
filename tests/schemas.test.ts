@@ -28,6 +28,11 @@ describe("ActionBatchPayload validation", () => {
 	it("accepts a valid multi-action batch", () => {
 		const payload = parseActionBatchPayload({
 			batchId: "batch-1",
+			reflection: {
+				confidence: 0.9,
+				successCriteria: "all actions complete",
+				risks: ["none"],
+			},
 			actions: [
 				{ type: "read_lines", path: "src/index.ts", startLine: 1, endLine: 50 },
 				{ type: "grep_pattern", pattern: "export", glob: "*.ts" },
@@ -43,6 +48,7 @@ describe("ActionBatchPayload validation", () => {
 
 		expect(payload.actions).toHaveLength(4);
 		expect(payload.batchId).toBe("batch-1");
+		expect(payload.reflection?.confidence).toBe(0.9);
 	});
 
 	it("rejects empty action arrays", () => {
