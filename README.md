@@ -221,12 +221,22 @@ Do **not** use `batch_queue` for a single obvious read/search/command, independe
 
 ## Research inspirations
 
-Recent planning features are inspired by two 2026 arXiv papers surfaced via alphaXiv trending papers:
+The **primary architectural inspiration** for `batch_queue` is [**RGB-Agent / Read-Grep-Bash Agent**](https://github.com/alexisfox7/RGB-Agent), an agent for [ARC-AGI-3](https://three.arcprize.org/). Its README reports completing all three preview games in **1,069 actions**, described there as the **lowest publicly reported count**. This is a public result reported by the project, not a claim that it won an official global leaderboard.
+
+RGB-Agent’s core pattern is the one `batch_queue` generalizes for coding work:
+
+1. an analyzer/planner inspects the environment and emits a JSON action plan;
+2. an action queue executes the plan with zero LLM calls per action;
+3. the analyzer runs again when the queue empties or important observations change.
+
+`batch_queue` adapts that Read/Grep/Bash planning-and-queue pattern to Pi and OpenCode repository workflows, adding workspace-safe file actions, persistent shell state, fast-fail execution, objective grounding, and optional typed result bindings.
+
+Two additional design inspirations are:
 
 - [**Metacognition in LLMs: Foundations, Progress, and Opportunities**](https://arxiv.org/abs/2607.11881) motivates planner self-check metadata. Objective-planned batches can attach a `reflection` object with confidence, success criteria, risks, and fallback guidance so the driver can see how certain the planner was.
 - [**Function-Aware Fill-in-the-Middle as Mid-Training for Coding Agent Foundation Models**](https://arxiv.org/abs/2607.12463) observes that an agent action-observation-continuation loop resembles a function call whose return value is consumed downstream. `batch_queue` mirrors that idea with `bindTo` result bindings and `${name}` references between sequential actions.
 
-These papers are not dependencies or implementations; they are design inspiration for making batched planning more explicit, inspectable, and compositional.
+These projects and papers are inspirations, not runtime dependencies or claims of reimplementation.
 
 ## Manage install
 
