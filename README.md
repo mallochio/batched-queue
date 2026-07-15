@@ -1,6 +1,27 @@
 # batched-queue
 
-Stateful batched action queue for [Pi](https://github.com/earendil-works/pi-mono) and [OpenCode](https://opencode.ai) coding agent sessions. It executes up to N sequential actions (`read_lines`, `grep_pattern`, `execute_bash`, `apply_diff`) in one tool call with persistent shell state and fast-fail semantics.
+## Plan once. Execute a verified action pipeline. Replan from evidence.
+
+`batched-queue` is a low-latency tool for [Pi](https://github.com/earendil-works/pi) and [OpenCode](https://opencode.ai) coding-agent sessions. It executes up to N short, dependent repository actions in one tool call, preserving shell state and returning structured evidence for the next planning decision.
+
+Instead of forcing the model to stop after every observation, a session can submit a small typed pipeline:
+
+```text
+discover → inspect → verify
+```
+
+The queue executes `read_lines`, `grep_pattern`, `execute_bash`, and `apply_diff` actions sequentially with fast-fail semantics, workspace boundaries, optional result bindings, and no additional model calls during action execution.
+
+### The middle ground between one tool call and a workflow engine
+
+| Need | Best fit |
+| --- | --- |
+| One obvious read, search, or command | Native Pi/OpenCode tools |
+| Independent reads or searches | Parallel tool calls |
+| 2–10 dependent repository actions | `batch_queue` |
+| Large DAGs, fan-out, worktrees, or durable jobs | A workflow/orchestration system |
+
+`batch_queue` is intentionally small: it is not a replacement for a multi-agent workflow engine. Its purpose is to compress short dependent tool sequences without hiding action boundaries or failure evidence.
 
 ## Project layout
 
@@ -169,7 +190,7 @@ The `batch_queue` tool accepts either:
 - `actions`: a pre-planned batch from the session driver / planner (preferred)
 - `objective`: the session driver plans by default, or a configured cheap execution model when set
 
-RGB-style workflow: plan a batch, execute with zero per-action LLM calls, read the `next steps` hints, then replan if needed.
+RGB-style workflow: plan a batch, execute with no additional model call per action, read the `next steps` hints, then replan if needed.
 
 For coding sessions, prefer `batch_queue` for small sequential inspect/search/check loops instead of making multiple individual tool calls.
 

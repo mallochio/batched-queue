@@ -1,7 +1,7 @@
 {
   "name": "batched-queue",
   "version": "0.1.0",
-  "description": "Stateful batched action queue for Pi and OpenCode (read, grep, bash, apply_diff)",
+  "description": "Low-latency planner-to-action batching for Pi and OpenCode: execute dependent repo steps with persistent shell state, result bindings, and fast-fail safety.",
   "license": "MIT",
   "type": "module",
   "main": ".opencode/plugins/batched-queue.ts",
@@ -10,7 +10,11 @@
     "pi-extension",
     "pi",
     "opencode",
-    "opencode-plugin"
+    "opencode-plugin",
+    "planner-executor",
+    "tool-batching",
+    "action-pipeline",
+    "sequential-execution"
   ],
   "repository": {
     "type": "git",
