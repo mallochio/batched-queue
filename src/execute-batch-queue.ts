@@ -1,7 +1,7 @@
 import type { QueueAction } from "./actions.js";
 import type { ResolvedBatchQueueConfig } from "./config.js";
 import { parseActionBatchPayloadWithConfig } from "./guards.js";
-import type { ActionBatchPayload } from "./payload.js";
+import type { ActionBatchPayload, PlanReflection } from "./payload.js";
 import type { BatchExecutionResult } from "./results.js";
 import { formatBatchResult } from "./format-batch-result.js";
 import { BatchQueueRunner } from "./queue-runner.js";
@@ -24,6 +24,8 @@ export interface BatchQueueExecuteDeps {
 export interface BatchQueueExecuteResult {
 	readonly text: string;
 	readonly isError: boolean;
+	readonly rationale?: string;
+	readonly reflection?: PlanReflection;
 	readonly result?: BatchExecutionResult;
 	readonly error?: string;
 }
@@ -71,6 +73,13 @@ export async function executeBatchQueue(options: {
 	let payload: ActionBatchPayload;
 
 	try {
+		if (params.objective?.trim() && params.actions && params.actions.length > 0) {
+			return {
+				text: "batch_queue accepts exactly one of `objective` or `actions`, not both",
+				isError: true,
+				error: "objective and actions are mutually exclusive",
+			};
+		}
 		if (params.actions && params.actions.length > 0) {
 			payload = parseActionBatchPayloadWithConfig(
 				{ actions: params.actions, batchId: params.batchId },
@@ -116,6 +125,8 @@ export async function executeBatchQueue(options: {
 	return {
 		text,
 		isError: result.haltedPrematurely,
+		rationale: payload.rationale,
+		reflection: payload.reflection,
 		result,
 	};
 }

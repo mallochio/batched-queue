@@ -72,6 +72,30 @@ describe("planBatchWithGrounding", () => {
 		expect(lastTools).toEqual(["submit_action_batch"]);
 	});
 
+	it("retries once when the model replies without a tool call", async () => {
+		let calls = 0;
+		const deps = baseDeps({
+			config: resolveBatchQueueConfig({}, { groundingTurns: 0 }),
+			complete: async (context) => {
+				calls += 1;
+				if (calls === 1) {
+					return { stopReason: "stop", content: [{ type: "text" }] };
+				}
+				expect(context.messages.some((message) =>
+					JSON.stringify(message).includes("You must call submit_action_batch now"),
+				)).toBe(true);
+				return {
+					stopReason: "toolUse",
+					content: [{ type: "toolCall", id: "s", name: "submit_action_batch", arguments: { actions: [{ type: "grep_pattern", pattern: "x" }] } }],
+				};
+			},
+		});
+
+		const payload = await planBatchWithGrounding(deps);
+		expect(calls).toBe(2);
+		expect(payload.actions[0]?.type).toBe("grep_pattern");
+	});
+
 	it("throws when the model never submits", async () => {
 		const deps = baseDeps({
 			config: resolveBatchQueueConfig({}, { groundingTurns: 1 }),
@@ -81,6 +105,6 @@ describe("planBatchWithGrounding", () => {
 			}),
 			runInspect: async () => "data",
 		});
-		await expect(planBatchWithGrounding(deps)).rejects.toThrow("did not return submit_action_batch");
+		await expect(planBatchWithGrounding(deps)).rejects.toThrow("stronger BATCH_QUEUE_EXECUTOR");
 	});
 });

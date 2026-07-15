@@ -64,9 +64,10 @@ export async function executeGrepPattern(
 
 	args.push(action.pattern, searchPath);
 
-	const { events, exitCode, errorMessage, timedOut } = await runRipgrep(
+	const { events, matchCount, truncated, exitCode, errorMessage, timedOut } = await runRipgrep(
 		args,
 		ctx.defaultTimeoutMs,
+		ctx.limits.maxGrepMatches,
 	);
 
 	if (timedOut) {
@@ -101,21 +102,15 @@ export async function executeGrepPattern(
 		};
 	}
 
-	const matches: GrepMatchEntry[] = [];
-	for (const event of events) {
-		if (matches.length >= ctx.limits.maxGrepMatches) break;
-
+	const matches: GrepMatchEntry[] = events.map((event) => {
 		const rel = path.relative(ctx.workspaceRoot, event.filePath).replace(/\\/g, "/");
-		matches.push({
+		return {
 			path: rel.startsWith("..") ? event.filePath : rel,
 			lineNumber: event.lineNumber,
 			text: truncateLineText(event.lineText, ctx.limits.maxLineChars),
 			isContext: event.kind === "context",
-		});
-	}
-
-	const matchCount = events.filter((event) => event.kind === "match").length;
-	const truncated = matchCount > ctx.limits.maxGrepMatches;
+		};
+	});
 
 	return {
 		index,
@@ -131,10 +126,12 @@ export async function executeGrepPattern(
 			? {
 					truncated: true,
 					unit: "lines",
-					totalUnits: matchCount,
-					headUnits: ctx.limits.maxGrepMatches,
+					// Ripgrep is stopped on the first omitted match, so this is the
+					// minimum total rather than an expensive full-repository count.
+					totalUnits: matchCount + 1,
+					headUnits: matchCount,
 					tailUnits: 0,
-					omittedUnits: matchCount - ctx.limits.maxGrepMatches,
+					omittedUnits: 1,
 				}
 			: undefined,
 	};
@@ -150,8 +147,11 @@ interface RgEvent {
 async function runRipgrep(
 	args: string[],
 	timeoutMs: number,
+	maxMatches: number,
 ): Promise<{
 	events: RgEvent[];
+	matchCount: number;
+	truncated: boolean;
 	exitCode: number;
 	errorMessage?: string;
 	timedOut?: boolean;
@@ -160,7 +160,9 @@ async function runRipgrep(
 		const child = spawn("rg", args, { stdio: ["ignore", "pipe", "pipe"] });
 		let stderr = "";
 		const events: RgEvent[] = [];
+		let matchCount = 0;
 		let timedOut = false;
+		let stoppedAtLimit = false;
 
 		const timer = setTimeout(() => {
 			timedOut = true;
@@ -175,6 +177,7 @@ async function runRipgrep(
 		child.stdout.setEncoding("utf8");
 		let pending = "";
 		child.stdout.on("data", (chunk: string) => {
+			if (stoppedAtLimit) return;
 			pending += chunk;
 			const lines = pending.split("\n");
 			pending = lines.pop() ?? "";
@@ -191,10 +194,16 @@ async function runRipgrep(
 						};
 					};
 					if (event.type !== "match" && event.type !== "context") continue;
+					if (event.type === "match" && matchCount >= maxMatches) {
+						stoppedAtLimit = true;
+						child.kill("SIGTERM");
+						break;
+					}
 					const filePath = event.data?.path?.text;
 					const lineNumber = event.data?.line_number;
 					const lineText = (event.data?.lines?.text ?? "").replace(/\r?\n$/, "");
 					if (!filePath || typeof lineNumber !== "number") continue;
+					if (event.type === "match") matchCount += 1;
 					events.push({
 						kind: event.type,
 						filePath,
@@ -209,7 +218,7 @@ async function runRipgrep(
 
 		child.on("error", (error) => {
 			clearTimeout(timer);
-			resolve({ events, exitCode: 127, errorMessage: error.message });
+			resolve({ events, matchCount, truncated: stoppedAtLimit, exitCode: 127, errorMessage: error.message });
 		});
 
 		child.on("close", (code) => {
@@ -217,6 +226,8 @@ async function runRipgrep(
 			if (timedOut) {
 				resolve({
 					events,
+					matchCount,
+					truncated: false,
 					exitCode: BASH_TIMEOUT_EXIT_CODE,
 					errorMessage: `ripgrep timed out after ${timeoutMs}ms`,
 					timedOut: true,
@@ -224,16 +235,23 @@ async function runRipgrep(
 				return;
 			}
 
+			if (stoppedAtLimit) {
+				resolve({ events, matchCount, truncated: true, exitCode: 0 });
+				return;
+			}
+
 			const exitCode = code ?? 2;
 			if (exitCode !== 0 && exitCode !== 1) {
 				resolve({
 					events,
+					matchCount,
+					truncated: false,
 					exitCode,
 					errorMessage: stderr.trim() || `ripgrep exited with code ${exitCode}`,
 				});
 				return;
 			}
-			resolve({ events, exitCode });
+			resolve({ events, matchCount, truncated: false, exitCode });
 		});
 	});
 }

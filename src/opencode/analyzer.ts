@@ -98,6 +98,7 @@ function buildObjectivePrompt(objective: string, config: ResolvedBatchQueueConfi
 		"",
 		`Objective:\n${objective}`,
 		"",
+		"Do not answer with markdown or prose.",
 		'Return ONLY a JSON object shaped like {"actions":[...],"rationale":"...","reflection":{"confidence":0.8,"successCriteria":"...","risks":["..."],"fallback":"..."}}.',
 	].join("\n");
 }

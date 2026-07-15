@@ -126,7 +126,8 @@ export function analyzerSystemPrompt(
 
 	return [
 		"You are the batch planner for a coding agent.",
-		"Given an objective, emit a sequential action batch as JSON via the submit_action_batch tool.",
+		"You must call a tool; do not answer in prose or markdown.",
+		"When ready to plan, call exactly one submit_action_batch tool with the JSON batch.",
 		...groundingGuidance,
 		"Plan the smallest batch that accomplishes the objective. Prefer short batches (3-5 actions) so the agent re-observes and adapts; only plan more when the extra steps are clearly needed.",
 		"Use deterministic actions: read/grep before shell.",
@@ -142,6 +143,24 @@ export function analyzerSystemPrompt(
 		"Keep batches concise and actionable; stop once enough context or verification is gathered.",
 		...reflectionGuidance,
 	].join("\n");
+}
+
+function summarizePlannerContent(response: CompleteResponse): string {
+	const parts = response.content.map((entry) => {
+		if (entry.type === "toolCall" && "name" in entry) {
+			return `tool:${entry.name}`;
+		}
+		return entry.type;
+	});
+	return parts.length > 0 ? parts.join(", ") : "empty response";
+}
+
+function plannerSubmitReminder(): Message {
+	return {
+		role: "user",
+		content: [{ type: "text", text: "You must call submit_action_batch now. Do not reply with text." }],
+		timestamp: Date.now(),
+	} as Message;
 }
 
 function buildSubmitBatchTool(config: ResolvedBatchQueueConfig): Tool {
@@ -301,9 +320,11 @@ export async function planBatchWithGrounding(deps: PlanBatchDeps): Promise<Actio
 	];
 
 	const systemPrompt = analyzerSystemPrompt(config, grounding);
-	// One request per grounding turn, plus a final forced submit.
-	for (let turn = 0; turn <= config.groundingTurns; turn += 1) {
-		const lastTurn = turn === config.groundingTurns;
+	// One request per grounding turn, plus one retry if the model replies without a usable tool call.
+	let badResponseSummary = "empty response";
+	for (let turn = 0; turn <= config.groundingTurns + 1; turn += 1) {
+		const retryTurn = turn > config.groundingTurns;
+		const lastTurn = turn >= config.groundingTurns;
 		const response = await complete(
 			{ systemPrompt, messages, tools: lastTurn ? [submitTool] : tools },
 			{
@@ -330,11 +351,17 @@ export async function planBatchWithGrounding(deps: PlanBatchDeps): Promise<Actio
 			return payload;
 		}
 
-		const inspects = toolCalls.filter(
+		const inspects = retryTurn || lastTurn ? [] : toolCalls.filter(
 			(call) => call.name === "inspect_read" || call.name === "inspect_grep",
 		);
 		if (inspects.length === 0) {
-			throw new Error("planning model did not return submit_action_batch");
+			badResponseSummary = summarizePlannerContent(response);
+			if (!retryTurn) {
+				messages.push({ role: "assistant", content: response.content } as Message);
+				messages.push(plannerSubmitReminder());
+				continue;
+			}
+			throw new Error(`planning model did not return submit_action_batch (got ${badResponseSummary}); try explicit actions, a smaller objective, or a stronger BATCH_QUEUE_EXECUTOR`);
 		}
 
 		messages.push({ role: "assistant", content: response.content } as Message);
@@ -351,7 +378,7 @@ export async function planBatchWithGrounding(deps: PlanBatchDeps): Promise<Actio
 		}
 	}
 
-	throw new Error("planning model did not return submit_action_batch");
+	throw new Error(`planning model did not return submit_action_batch (got ${badResponseSummary}); try explicit actions, a smaller objective, or a stronger BATCH_QUEUE_EXECUTOR`);
 }
 
 export function createBatchQueueToolParameters(maxBatchActions: number) {

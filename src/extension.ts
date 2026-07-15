@@ -22,6 +22,7 @@ import {
 } from "./config";
 import { loadFileConfig } from "./file-config";
 import { analyzeBatchObjective, createBatchQueueToolParameters } from "./analyzer";
+import type { PlanReflection } from "./payload";
 import type { BatchExecutionResult } from "./results";
 import {
 	createRunnerMap,
@@ -36,6 +37,8 @@ interface BatchQueueToolDetails {
 	readonly driverModel: { readonly provider: string; readonly id: string };
 	readonly planningModel: ModelRef;
 	readonly maxBatchActions: number;
+	readonly rationale?: string;
+	readonly reflection?: PlanReflection;
 	readonly result: BatchExecutionResult;
 }
 
@@ -153,7 +156,11 @@ export function registerBatchedQueueExtension(
 					}
 				}
 
-				const hints = buildBatchContinuationHints(batch, { usedObjective });
+				const hints = buildBatchContinuationHints(batch, {
+					rationale: details.rationale,
+					reflection: details.reflection,
+					usedObjective,
+				});
 				if (hints.length > 0) {
 					if (batch.results.length === 0) lines.push("");
 					lines.push(theme.fg("border", "─── ") + theme.fg("toolTitle", theme.bold("Next Steps ")) + theme.fg("border", "───────────────────────────"));
@@ -232,6 +239,8 @@ export function registerBatchedQueueExtension(
 					},
 					planningModel,
 					maxBatchActions: resolvedConfig.maxBatchActions,
+					rationale: executeResult.rationale,
+					reflection: executeResult.reflection,
 					result: executeResult.result,
 				} satisfies BatchQueueToolDetails,
 				isError: executeResult.isError,
