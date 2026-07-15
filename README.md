@@ -185,7 +185,39 @@ Actions can form a typed mini-pipeline. Add `bindTo` to any action to name its r
 
 Use `actions` when you already know the exact deterministic steps, especially for `apply_diff`. Use `objective` only when enumerating steps is tedious.
 
-Prefer `multi_tool_use.parallel` instead for independent parallel reads/searches. Do not use `batch_queue` for destructive, long-running, interactive, or approval-sensitive commands. File actions are workspace-scoped unless configured otherwise.
+### Quick examples
+
+Use `objective` for dependent read/check workflows where the planner should decide the exact safe steps:
+
+```json
+{
+  "objective": "Find the config loader, read the relevant code, and run the smallest local check that verifies it still works."
+}
+```
+
+Use explicit `actions` when the steps are already known or when applying a mutation:
+
+```json
+{
+  "actions": [
+    { "type": "read_lines", "path": "src/config.ts", "startLine": 1, "endLine": 120 },
+    { "type": "execute_bash", "command": "npm test -- config" }
+  ]
+}
+```
+
+Use `bindTo` when a later action needs an earlier observation:
+
+```json
+{
+  "actions": [
+    { "type": "read_lines", "path": "README.md", "startLine": 1, "endLine": 1, "bindTo": "title" },
+    { "type": "execute_bash", "command": "printf '%s' '${title}'" }
+  ]
+}
+```
+
+Do **not** use `batch_queue` for a single obvious read/search/command, independent parallel reads/searches, destructive commands, long-running commands, interactive commands, or anything that needs user approval. Prefer `multi_tool_use.parallel` instead for independent parallel reads/searches. File actions are workspace-scoped unless configured otherwise.
 
 ## Research inspirations
 
