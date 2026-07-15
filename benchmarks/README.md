@@ -12,6 +12,7 @@ This is intentionally narrower than a claim that `batch_queue` is faster for eve
 
 - [`DETERMINISTIC-PLAN.md`](./DETERMINISTIC-PLAN.md) — API-key-free executor and safety benchmark suitable for CI.
 - [`MODEL-MEDIATED-PLAN.md`](./MODEL-MEDIATED-PLAN.md) — controlled Pi/OpenCode comparison using a fixed model and isolated fixtures.
+- [`PI-HEADLESS-HANDOFF.md`](./PI-HEADLESS-HANDOFF.md) — executable handoff for measuring Pi JSON-mode sessions, token usage, latency, and correctness.
 - [`RESULTS-TEMPLATE.md`](./RESULTS-TEMPLATE.md) — report template; do not fill it with unverified or cherry-picked results.
 
 ## Conditions to compare
