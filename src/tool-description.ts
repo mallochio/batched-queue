@@ -18,7 +18,7 @@ export function buildBatchQueueDescription(
 		"Use explicit `actions` only for 2+ exact ordered actions, apply_diff/mutations, or continuing after a failed batch. Do not wrap a single obvious command in actions.\n" +
 		"Objective-planned mutations are disabled by default; pass explicit `actions` for apply_diff or enable allowObjectiveMutations in config.\n" +
 		"Each batched action should be a short, non-interactive command; run long-running, interactive, or approval-sensitive commands through the normal tools instead.\n\n" +
-		"Action types: read_lines, grep_pattern, execute_bash, apply_diff.\n" +
+		"Action types: read_lines, grep_pattern, execute_bash, apply_diff. Optional `bindTo` names an action result; later string fields can reference `${name}`.\n" +
 		"Fast-fail: batch halts on first non-zero exit or validation failure. File actions are workspace-scoped unless configured otherwise.\n" +
 		`Planner / driver model: ${driverModelLine}\n` +
 		`Execution model (objective batches only): ${configuredExecutionModelDescription(config)}`

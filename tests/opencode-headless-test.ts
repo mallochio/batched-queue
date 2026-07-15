@@ -52,8 +52,8 @@ const toolContext: ToolContext = {
 const result = await batchQueue.execute(
 	{
 		actions: [
-			{ type: "read_lines", path: "hello.txt", startLine: 1, endLine: 1 },
-			{ type: "execute_bash", command: "printf ok" },
+			{ type: "read_lines", path: "hello.txt", startLine: 1, endLine: 1, bindTo: "greeting" },
+			{ type: "execute_bash", command: "printf '%s' '${greeting}'" },
 		],
 	},
 	toolContext,

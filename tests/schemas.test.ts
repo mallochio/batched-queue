@@ -34,9 +34,9 @@ describe("ActionBatchPayload validation", () => {
 				risks: ["none"],
 			},
 			actions: [
-				{ type: "read_lines", path: "src/index.ts", startLine: 1, endLine: 50 },
-				{ type: "grep_pattern", pattern: "export", glob: "*.ts" },
-				{ type: "execute_bash", command: "npm test" },
+				{ type: "read_lines", path: "src/index.ts", startLine: 1, endLine: 50, bindTo: "indexSnippet" },
+				{ type: "grep_pattern", pattern: "export", glob: "*.ts", bindTo: "exports" },
+				{ type: "execute_bash", command: "npm test", bindTo: "testOutput" },
 				{
 					type: "apply_diff",
 					path: "src/index.ts",

@@ -48,10 +48,12 @@ describe("planBatchWithGrounding", () => {
 		expect(payload.actions[0]?.type).toBe("read_lines");
 	});
 
-	it("includes planner reflection guidance by default", () => {
+	it("includes planner reflection and typed binding guidance by default", () => {
 		const prompt = analyzerSystemPrompt(resolveBatchQueueConfig(), false);
 		expect(prompt).toContain("reflection");
 		expect(prompt).toContain("confidence");
+		expect(prompt).toContain("bindTo");
+		expect(prompt).toContain("${name}");
 	});
 
 	it("forces submit-only tools on the final turn", async () => {

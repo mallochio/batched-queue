@@ -5,12 +5,20 @@ import {
 	MIN_BATCH_ACTIONS,
 } from "./constants.js";
 
+const BindingFields = {
+	bindTo: Type.Optional(Type.String({
+		pattern: "^[A-Za-z_][A-Za-z0-9_]*$",
+		description: "Optional variable name for this action result; later string fields can reference it as ${name}.",
+	})),
+};
+
 const ReadLinesActionSchema = Type.Object(
 	{
 		type: Type.Literal("read_lines"),
 		path: Type.String({ minLength: 1 }),
 		startLine: Type.Optional(Type.Integer({ minimum: 1 })),
 		endLine: Type.Optional(Type.Integer({ minimum: 1 })),
+		...BindingFields,
 	},
 	{ additionalProperties: false },
 );
@@ -24,6 +32,7 @@ const GrepPatternActionSchema = Type.Object(
 		caseSensitive: Type.Optional(Type.Boolean()),
 		literal: Type.Optional(Type.Boolean()),
 		contextLines: Type.Optional(Type.Integer({ minimum: 0, maximum: 10 })),
+		...BindingFields,
 	},
 	{ additionalProperties: false },
 );
@@ -33,6 +42,7 @@ const ExecuteBashActionSchema = Type.Object(
 		type: Type.Literal("execute_bash"),
 		command: Type.String({ minLength: 1 }),
 		timeoutMs: Type.Optional(Type.Integer({ minimum: 1 })),
+		...BindingFields,
 	},
 	{ additionalProperties: false },
 );
@@ -44,6 +54,7 @@ const ApplyDiffActionSchema = Type.Object(
 		oldText: Type.String(),
 		newText: Type.String(),
 		replaceAll: Type.Optional(Type.Boolean()),
+		...BindingFields,
 	},
 	{ additionalProperties: false },
 );

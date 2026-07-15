@@ -1,11 +1,18 @@
 import { tool } from "@opencode-ai/plugin";
 import type { ResolvedBatchQueueConfig } from "../config.js";
 
+const bindToSchema = tool.schema
+	.string()
+	.regex(/^[A-Za-z_][A-Za-z0-9_]*$/)
+	.optional()
+	.describe("Optional variable name for this action result; later string fields can reference it as ${name}.");
+
 const readLinesActionSchema = tool.schema.object({
 	type: tool.schema.literal("read_lines"),
 	path: tool.schema.string().min(1),
 	startLine: tool.schema.number().int().min(1).optional(),
 	endLine: tool.schema.number().int().min(1).optional(),
+	bindTo: bindToSchema,
 });
 
 const grepPatternActionSchema = tool.schema.object({
@@ -16,12 +23,14 @@ const grepPatternActionSchema = tool.schema.object({
 	caseSensitive: tool.schema.boolean().optional(),
 	literal: tool.schema.boolean().optional(),
 	contextLines: tool.schema.number().int().min(0).max(10).optional(),
+	bindTo: bindToSchema,
 });
 
 const executeBashActionSchema = tool.schema.object({
 	type: tool.schema.literal("execute_bash"),
 	command: tool.schema.string().min(1),
 	timeoutMs: tool.schema.number().int().min(1).optional(),
+	bindTo: bindToSchema,
 });
 
 const applyDiffActionSchema = tool.schema.object({
@@ -30,6 +39,7 @@ const applyDiffActionSchema = tool.schema.object({
 	oldText: tool.schema.string(),
 	newText: tool.schema.string(),
 	replaceAll: tool.schema.boolean().optional(),
+	bindTo: bindToSchema,
 });
 
 /** Driver-supplied explicit actions always allow all action types (matches Pi). */

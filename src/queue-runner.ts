@@ -18,6 +18,12 @@ import {
 import { createPersistentShell, type PersistentShell } from "./persistent-shell";
 import { executeQueueAction } from "./executors";
 import { DEFAULT_FAILURE_HALT_REASON } from "./results";
+import {
+	BatchVariableResolutionError,
+	bindActionResult,
+	resolveActionBindings,
+	type BatchVariableBindings,
+} from "./bindings";
 import { DEFAULT_PATH_SECURITY, findWorkspaceRoot, type PathSecurityConfig } from "./lib/path-security";
 
 export interface BatchQueueRunnerOptions {
@@ -41,6 +47,10 @@ function shouldHaltBatch(result: ActionExecutionResult): boolean {
 
 function shouldResetShell(result: ActionExecutionResult): boolean {
 	return result.haltReason === "timeout";
+}
+
+function resolveBatchErrorHaltReason(error: unknown): BatchHaltReason {
+	return error instanceof BatchVariableResolutionError ? "validation_failed" : "shell_unavailable";
 }
 
 /**
@@ -136,10 +146,12 @@ export class BatchQueueRunner {
 
 		try {
 			const shell = await this.ensureShell();
+			const bindings: BatchVariableBindings = {};
 
 			for (let index = 0; index < payload.actions.length; index++) {
 				const action = payload.actions[index];
-				const result = await executeQueueAction(action, index, {
+				const resolvedAction = resolveActionBindings(action, bindings);
+				const result = await executeQueueAction(resolvedAction, index, {
 					workspaceRoot: this.session.workspaceRoot,
 					gitWorkspaceRoot: this.gitWorkspaceRoot,
 					pathSecurity: this.pathSecurity,
@@ -150,6 +162,7 @@ export class BatchQueueRunner {
 				});
 
 				results.push(result);
+				bindActionResult(resolvedAction, result, bindings);
 				this.session.metrics.totalActionsExecuted += 1;
 				this.session.updatedAtMs = Date.now();
 
@@ -167,7 +180,7 @@ export class BatchQueueRunner {
 			}
 		} catch (error) {
 			haltedPrematurely = true;
-			haltReason = "shell_unavailable";
+			haltReason = resolveBatchErrorHaltReason(error);
 			batchError = error instanceof Error ? error.message : String(error);
 			haltedAtIndex = results.length;
 			this.session.metrics.totalHalts += 1;

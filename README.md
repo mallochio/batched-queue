@@ -181,6 +181,8 @@ Use it when you need up to 10 low-risk sequential repo actions:
 - apply a targeted diff
 - verify a local change
 
+Actions can form a typed mini-pipeline. Add `bindTo` to any action to name its result, then reference that raw text in later string fields as `${name}`. This is most useful for objective-planned batches where a read/grep result determines a follow-up command. Quote interpolated values carefully in shell commands; substitution is raw text, not shell escaping.
+
 Use `actions` when you already know the exact deterministic steps, especially for `apply_diff`. Use `objective` only when enumerating steps is tedious.
 
 Prefer `multi_tool_use.parallel` instead for independent parallel reads/searches. Do not use `batch_queue` for destructive, long-running, interactive, or approval-sensitive commands. File actions are workspace-scoped unless configured otherwise.
