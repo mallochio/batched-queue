@@ -74,17 +74,13 @@ export function registerBatchedQueueExtension(
 		label: "Batch Queue",
 		description,
 		promptSnippet:
-			"For 2–10 dependent repository steps, batch_queue replaces multiple model/tool turns with one bounded sequential execution turn while preserving shell state, action evidence, and failure boundaries.",
+			"Run 2+ dependent repo steps (read → grep → bash) in one call instead of several separate tool calls.",
 		promptGuidelines: [
-			"Use batch_queue for 2 or more short, dependent repository actions that should run as one pipeline.",
-			"Use native read/grep/bash tools for one obvious action; use parallel tool calls for independent actions.",
-			"Prefer `objective` for multi-step repository inspection, verification, and read/check workflows; it grounds the plan in the workspace and can attach reflection metadata.",
-			"Use explicit `actions` when the exact sequence is known, when applying `apply_diff`, or when continuing after a failed batch.",
-			"Use action `bindTo` only when a later action consumes that observation; reference bound results as `${name}` only after the binding action has run.",
-			"Quote `${name}` substitutions carefully in execute_bash commands because interpolation is raw text, not shell escaping.",
-			"Objective mode is read/check-only by default; use explicit actions for mutations unless objective mutations are enabled.",
-			"After a batch completes or halts, read its reflection and next-steps evidence before deciding whether to replan.",
-			"Keep each action short, non-interactive, and bounded; route long-running, destructive, interactive, or approval-sensitive commands through normal tools.",
+			"Use batch_queue for any 2+ dependent repo steps — e.g. read a file, grep a symbol, then run its test — instead of separate tool calls.",
+			"Pass `actions` for a deterministic sequence (preferred for edits/apply_diff). Pass `objective` to let the tool plan read/check steps from a goal.",
+			"Use `bindTo` to name a step's output and reference it in a later step as `${name}`; quote it in shell commands since it's raw text.",
+			"Objective mode is read/check-only; use explicit actions for mutations.",
+			"Keep actions short and non-interactive; route destructive or long-running commands through native tools.",
 		],
 		executionMode: "sequential",
 

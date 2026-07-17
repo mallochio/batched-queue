@@ -56,7 +56,7 @@ export function createBatchQueueZodArgs(config: ResolvedBatchQueueConfig) {
 			.string()
 			.optional()
 			.describe(
-				"Default for 2+ dependent repo steps. Describe the multi-step task; batch_queue plans and runs a safe sequential read/check action batch. Do not use for one obvious command.",
+				"Describe a multi-step repo task (e.g. 'read config.ts, find where defaults load, run its test') and batch_queue plans and runs safe sequential read/grep/bash steps.",
 			),
 		actions: tool.schema
 			.array(driverQueueActionSchema)
@@ -64,7 +64,7 @@ export function createBatchQueueZodArgs(config: ResolvedBatchQueueConfig) {
 			.max(config.maxBatchActions)
 			.optional()
 			.describe(
-				"Advanced escape hatch. Use only for 2+ exact ordered actions, mutation/apply_diff, or continuing after a failed batch; skips objective planning. Do not wrap one obvious command.",
+				"Pass the exact typed action sequence. Preferred for edits/apply_diff or when the steps are known. Each step can use a prior step's result via bindTo/${name}.",
 			),
 		batchId: tool.schema
 			.string()

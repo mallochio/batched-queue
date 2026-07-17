@@ -29,7 +29,7 @@ describe("ActionBatchPayload validation", () => {
 		const payload = parseActionBatchPayload({
 			batchId: "batch-1",
 			reflection: {
-				confidence: 0.9,
+				confidence: 4,
 				successCriteria: "all actions complete",
 				risks: ["none"],
 			},
@@ -48,7 +48,7 @@ describe("ActionBatchPayload validation", () => {
 
 		expect(payload.actions).toHaveLength(4);
 		expect(payload.batchId).toBe("batch-1");
-		expect(payload.reflection?.confidence).toBe(0.9);
+		expect(payload.reflection?.confidence).toBe(4);
 	});
 
 	it("rejects empty action arrays", () => {

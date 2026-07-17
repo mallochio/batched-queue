@@ -68,7 +68,7 @@ export const QueueActionSchema = Type.Union([
 
 export const PlanReflectionSchema = Type.Object(
 	{
-		confidence: Type.Number({ minimum: 0, maximum: 1 }),
+		confidence: Type.Integer({ minimum: 0, maximum: 5 }),
 		successCriteria: Type.String({ minLength: 1 }),
 		risks: Type.Array(Type.String(), { default: [] }),
 		fallback: Type.Optional(Type.String()),

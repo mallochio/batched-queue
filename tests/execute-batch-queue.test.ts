@@ -10,7 +10,7 @@ const deps = {
 		actions: [{ type: "read_lines" as const, path: "package.json", startLine: 1, endLine: 1 }],
 		rationale: "read package metadata",
 		reflection: {
-			confidence: 1,
+			confidence: 5,
 			successCriteria: "package metadata is returned",
 			risks: [],
 		},
@@ -32,7 +32,7 @@ describe("executeBatchQueue input selection", () => {
 			expect(result.isError).toBe(false);
 			if ("objective" in params) {
 				expect(result.rationale).toBe("read package metadata");
-				expect(result.reflection?.confidence).toBe(1);
+				expect(result.reflection?.confidence).toBe(5);
 			}
 		}
 	});

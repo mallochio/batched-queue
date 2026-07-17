@@ -25,9 +25,8 @@ export function buildBatchContinuationHints(
 	}
 
 	if (options.reflection) {
-		const confidence = Math.round(options.reflection.confidence * 100);
-		hints.push(`planner confidence: ${confidence}% — ${options.reflection.successCriteria}`);
-		if (options.reflection.confidence < 0.7 && options.reflection.fallback?.trim()) {
+		hints.push(`planner confidence: ${options.reflection.confidence}/5 — ${options.reflection.successCriteria}`);
+		if (options.reflection.confidence <= 3 && options.reflection.fallback?.trim()) {
 			hints.push(`low-confidence fallback: ${options.reflection.fallback.trim()}`);
 		}
 	}
@@ -69,7 +68,7 @@ function collapsibleBlock(title: string, language: string, text: string): string
 
 function formatPlanReflection(reflection: PlanReflection): string[] {
 	const lines = [
-		`- confidence: ${Math.round(reflection.confidence * 100)}%`,
+		`- confidence: ${reflection.confidence}/5`,
 		`- success criteria: ${reflection.successCriteria}`,
 	];
 	if (reflection.risks.length > 0) {

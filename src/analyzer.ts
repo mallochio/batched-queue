@@ -7,7 +7,6 @@ import { Type } from "@sinclair/typebox";
 import type { ActionBatchPayload } from "./payload.js";
 import type { ResolvedBatchQueueConfig } from "./config.js";
 import {
-	createSubmitActionBatchToolSchema,
 	GrepPatternActionSchema,
 	ReadLinesActionSchema,
 	QueueActionSchema,
@@ -113,21 +112,20 @@ export function analyzerSystemPrompt(
 		withGrounding && config.groundingTurns > 0
 			? [
 				`Ground before planning: you may call inspect_read and inspect_grep up to ${config.groundingTurns} times to look at the real repo first.`,
-				"Inspect only enough to plan accurately, then call submit_action_batch. Do not inspect once you have enough context.",
+				"Then output the JSON batch object. Do not inspect once you have enough context.",
 			]
 			: [];
 
 	const reflectionGuidance = config.requirePlanReflection
 		? [
-			"Attach a `reflection` object when submitting: confidence (0-1), successCriteria, risks, and optional fallback.",
-			"Use confidence below 0.7 when the objective is ambiguous or insufficiently grounded; in that case prefer a smaller read/check batch over speculative shell commands.",
+			"Attach a `reflection` object when submitting: confidence (integer 0-5), successCriteria, risks, and optional fallback.",
+			"Use confidence 3 or below when the objective is ambiguous or insufficiently grounded; in that case prefer a smaller read/check batch over speculative shell commands.",
 		]
 		: [];
 
 	return [
 		"You are the batch planner for a coding agent.",
-		"You must call a tool; do not answer in prose or markdown.",
-		"When ready to plan, call exactly one submit_action_batch tool with the JSON batch.",
+		"When ready to plan, output ONLY a valid JSON object with the batch. No prose, no markdown, no commentary.",
 		...groundingGuidance,
 		"Plan the smallest batch that accomplishes the objective. Prefer short batches (3-5 actions) so the agent re-observes and adapts; only plan more when the extra steps are clearly needed.",
 		"Use deterministic actions: read/grep before shell.",
@@ -141,6 +139,8 @@ export function analyzerSystemPrompt(
 		"Reference only variables bound by earlier actions; quote interpolated values carefully in shell commands because substitutions are raw text.",
 		"Order actions so each step can rely on prior shell state (cwd/env persist for execute_bash).",
 		"Keep batches concise and actionable; stop once enough context or verification is gathered.",
+		"Output format — a single JSON object:",
+		'{"actions":[{"type":"read_lines","path":"..."},{"type":"execute_bash","command":"..."}],"rationale":"...","reflection":{"confidence":4,"successCriteria":"...","risks":["..."],"fallback":"..."}}',
 		...reflectionGuidance,
 	].join("\n");
 }
@@ -155,22 +155,30 @@ function summarizePlannerContent(response: CompleteResponse): string {
 	return parts.length > 0 ? parts.join(", ") : "empty response";
 }
 
-function plannerSubmitReminder(): Message {
+function plannerJsonReminder(): Message {
 	return {
 		role: "user",
-		content: [{ type: "text", text: "You must call submit_action_batch now. Do not reply with text." }],
+		content: [{ type: "text", text: "Return ONLY the JSON batch object now. No prose, no markdown, no explanation." }],
 		timestamp: Date.now(),
 	} as Message;
 }
 
-function buildSubmitBatchTool(config: ResolvedBatchQueueConfig): Tool {
-	return {
-		name: "submit_action_batch",
-		description: "Submit the planned sequential action batch for execution.",
-		parameters: createSubmitActionBatchToolSchema(config.maxBatchActions, {
-			allowMutatingActions: config.allowObjectiveMutations,
-		}),
-	};
+function finalJsonSystemPrompt(config: ResolvedBatchQueueConfig): string {
+	const allowedActions = config.allowObjectiveMutations
+		? "read_lines, grep_pattern, execute_bash, apply_diff"
+		: "read_lines, grep_pattern, execute_bash";
+	return [
+		"You are emitting the final action batch for a coding agent.",
+		"Return ONLY valid JSON. No markdown, no prose, no comments.",
+		'{"actions":[{"type":"read_lines","path":"src/example.ts"}],"rationale":"inspect example","reflection":{"confidence":4,"successCriteria":"example inspected","risks":[],"fallback":"use explicit actions"}}',
+		`Allowed action types: ${allowedActions}.`,
+		config.allowObjectiveMutations
+			? "Mutate only when the objective clearly requires it."
+			: "Do not use apply_diff; objective mode is read/check-only.",
+		config.requirePlanReflection
+			? "Include reflection with confidence, successCriteria, risks, and optional fallback."
+			: "Reflection is optional.",
+	].join("\n");
 }
 
 const INSPECT_READ_TOOL: Tool = {
@@ -217,21 +225,33 @@ async function runInspectTool(
 	return result.matches.map((m) => `${m.path}:${m.lineNumber}: ${m.text}`).join("\n") || "(no matches)";
 }
 
-function extractBatchFromResponse(
-	response: { content: ({ type: string } | ToolCall)[] },
-	maxBatchActions: number,
-): ActionBatchPayload {
-	const toolCall = response.content.find(
-		(entry): entry is ToolCall =>
-			entry.type === "toolCall" &&
-			"name" in entry &&
-			entry.name === "submit_action_batch",
-	);
-	if (!toolCall) {
-		throw new Error("planning model did not return submit_action_batch");
+/**
+ * Extract a batch JSON payload from the model's text response.
+ * Tries direct parse, code blocks, and balanced-brace extraction.
+ */
+function extractBatchFromText(text: string): unknown | undefined {
+	const trimmed = text.trim();
+	if (!trimmed) return undefined;
+
+	// Direct JSON
+	if (trimmed.startsWith("{")) {
+		try { return JSON.parse(trimmed); } catch { /* not pure JSON */ }
 	}
 
-	return parseActionBatchPayload(toolCall.arguments, maxBatchActions);
+	// Code block
+	const codeBlockMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
+	if (codeBlockMatch?.[1]) {
+		try { return JSON.parse(codeBlockMatch[1].trim()); } catch { /* not JSON */ }
+	}
+
+	// Balanced brace extraction
+	const start = trimmed.indexOf("{");
+	const end = trimmed.lastIndexOf("}");
+	if (start !== -1 && end > start) {
+		try { return JSON.parse(trimmed.slice(start, end + 1)); } catch { /* not JSON */ }
+	}
+
+	return undefined;
 }
 
 export function assertObjectiveMutationPolicy(
@@ -309,27 +329,26 @@ export interface PlanBatchDeps {
  */
 export async function planBatchWithGrounding(deps: PlanBatchDeps): Promise<ActionBatchPayload> {
 	const { objective, config, complete, runInspect, signal } = deps;
-	const submitTool = buildSubmitBatchTool(config);
 	const grounding = config.groundingTurns > 0;
-	const tools: Tool[] = grounding
-		? [INSPECT_READ_TOOL, INSPECT_GREP_TOOL, submitTool]
-		: [submitTool];
+	const inspectTools: Tool[] = grounding
+		? [INSPECT_READ_TOOL, INSPECT_GREP_TOOL]
+		: [];
 
 	const messages: Message[] = [
 		{ role: "user", content: [{ type: "text", text: objective }], timestamp: Date.now() },
 	];
 
 	const systemPrompt = analyzerSystemPrompt(config, grounding);
-	// One request per grounding turn, plus one retry if the model replies without a usable tool call.
-	let badResponseSummary = "empty response";
 	for (let turn = 0; turn <= config.groundingTurns + 1; turn += 1) {
 		const retryTurn = turn > config.groundingTurns;
 		const lastTurn = turn >= config.groundingTurns;
+		const turnTools = lastTurn ? [] : inspectTools;
+		const turnMessages = lastTurn && !retryTurn ? [...messages, plannerJsonReminder()] : messages;
 		const response = await complete(
-			{ systemPrompt, messages, tools: lastTurn ? [submitTool] : tools },
+			{ systemPrompt: lastTurn ? finalJsonSystemPrompt(config) : systemPrompt, messages: turnMessages, tools: turnTools },
 			{
 				signal,
-				toolChoice: "any",
+				...(turnTools.length > 0 ? { toolChoice: "auto" as const } : {}),
 				...(config.executorThinking ? { reasoningEffort: config.executorThinking } : {}),
 			},
 		);
@@ -341,6 +360,7 @@ export async function planBatchWithGrounding(deps: PlanBatchDeps): Promise<Actio
 			throw new Error(response.errorMessage ?? "planning model request failed");
 		}
 
+		// Check for submit_action_batch tool call (backward compat with models that prefer tool calls).
 		const toolCalls = response.content.filter(
 			(entry): entry is ToolCall => entry.type === "toolCall" && "name" in entry,
 		);
@@ -351,34 +371,54 @@ export async function planBatchWithGrounding(deps: PlanBatchDeps): Promise<Actio
 			return payload;
 		}
 
-		const inspects = retryTurn || lastTurn ? [] : toolCalls.filter(
+		// Extract JSON batch from text response.
+		const textContent = response.content
+			.filter((entry): entry is { type: string; text: string } =>
+				"text" in entry && typeof (entry as { text?: unknown }).text === "string")
+			.map((entry) => entry.text)
+			.join("");
+		const jsonPayload = extractBatchFromText(textContent);
+		if (jsonPayload !== undefined) {
+			const payload = parseActionBatchPayload(jsonPayload, config.maxBatchActions);
+			assertObjectiveMutationPolicy(payload, config);
+			return payload;
+		}
+
+		// No batch yet — process inspect tool calls for grounding.
+		const inspects = toolCalls.filter(
 			(call) => call.name === "inspect_read" || call.name === "inspect_grep",
 		);
-		if (inspects.length === 0) {
-			badResponseSummary = summarizePlannerContent(response);
+		if (inspects.length > 0 && !lastTurn) {
+			messages.push({ role: "assistant", content: response.content } as Message);
+			for (const call of inspects) {
+				const text = await runInspect(call.name, call.arguments);
+				messages.push({
+					role: "toolResult",
+					toolCallId: call.id,
+					toolName: call.name,
+					content: [{ type: "text", text }],
+					isError: false,
+					timestamp: Date.now(),
+				} as Message);
+			}
+			continue;
+		}
+
+		if (lastTurn) {
+			const summary = summarizePlannerContent(response);
 			if (!retryTurn) {
 				messages.push({ role: "assistant", content: response.content } as Message);
-				messages.push(plannerSubmitReminder());
+				messages.push(plannerJsonReminder());
 				continue;
 			}
-			throw new Error(`planning model did not return submit_action_batch (got ${badResponseSummary}); try explicit actions, a smaller objective, or a stronger BATCH_QUEUE_EXECUTOR`);
+			throw new Error(`planning model did not return a batch plan (got ${summary}); try explicit actions, a smaller objective, or a stronger BATCH_QUEUE_EXECUTOR`);
 		}
 
+		// No inspects and no batch — advance to next turn.
 		messages.push({ role: "assistant", content: response.content } as Message);
-		for (const call of inspects) {
-			const text = await runInspect(call.name, call.arguments);
-			messages.push({
-				role: "toolResult",
-				toolCallId: call.id,
-				toolName: call.name,
-				content: [{ type: "text", text }],
-				isError: false,
-				timestamp: Date.now(),
-			} as Message);
-		}
 	}
 
-	throw new Error(`planning model did not return submit_action_batch (got ${badResponseSummary}); try explicit actions, a smaller objective, or a stronger BATCH_QUEUE_EXECUTOR`);
+	throw new Error("planning model did not return a batch plan; try explicit actions, a smaller objective, or a stronger BATCH_QUEUE_EXECUTOR");
 }
 
 export function createBatchQueueToolParameters(maxBatchActions: number) {
@@ -386,7 +426,7 @@ export function createBatchQueueToolParameters(maxBatchActions: number) {
 		objective: Type.Optional(
 			Type.String({
 				description:
-					"Default for 2+ dependent repo steps. Describe the multi-step task; batch_queue plans and runs a safe sequential read/check action batch. Do not use for one obvious command.",
+					"Describe a multi-step repo task (e.g. 'read config.ts, find where defaults load, run its test') and batch_queue plans and runs safe sequential read/grep/bash steps.",
 			}),
 		),
 		actions: Type.Optional(
@@ -394,7 +434,7 @@ export function createBatchQueueToolParameters(maxBatchActions: number) {
 				minItems: 1,
 				maxItems: maxBatchActions,
 				description:
-					"Advanced escape hatch. Use only for 2+ exact ordered actions, mutation/apply_diff, or continuing after a failed batch; skips objective planning. Do not wrap one obvious command.",
+					"Pass the exact typed action sequence. Preferred for edits/apply_diff or when the steps are known. Each step can use a prior step's result via bindTo/${name}.",
 			}),
 		),
 		batchId: Type.Optional(

@@ -56,44 +56,44 @@ describe("planBatchWithGrounding", () => {
 		expect(prompt).toContain("${name}");
 	});
 
-	it("forces submit-only tools on the final turn", async () => {
+	it("uses no tools on the final turn and parses JSON text", async () => {
 		let lastTools: string[] = [];
 		const deps = baseDeps({
 			config: resolveBatchQueueConfig({}, { groundingTurns: 0 }),
 			complete: async (context) => {
 				lastTools = context.tools.map((t) => t.name);
 				return {
-					stopReason: "toolUse",
-					content: [{ type: "toolCall", id: "s", name: "submit_action_batch", arguments: { actions: [{ type: "grep_pattern", pattern: "x" }] } }],
+					stopReason: "stop",
+					content: [{ type: "text", text: '{"actions":[{"type":"grep_pattern","pattern":"x"}]}' }],
 				};
 			},
 		});
-		await planBatchWithGrounding(deps);
-		expect(lastTools).toEqual(["submit_action_batch"]);
+		const payload = await planBatchWithGrounding(deps);
+		expect(lastTools).toEqual([]);
+		expect(payload.actions[0]?.type).toBe("grep_pattern");
 	});
 
-	it("retries once when the model replies without a tool call", async () => {
-		let calls = 0;
+	it("parses JSON from text when the model returns a code block", async () => {
 		const deps = baseDeps({
 			config: resolveBatchQueueConfig({}, { groundingTurns: 0 }),
-			complete: async (context) => {
-				calls += 1;
-				if (calls === 1) {
-					return { stopReason: "stop", content: [{ type: "text" }] };
-				}
-				expect(context.messages.some((message) =>
-					JSON.stringify(message).includes("You must call submit_action_batch now"),
-				)).toBe(true);
-				return {
-					stopReason: "toolUse",
-					content: [{ type: "toolCall", id: "s", name: "submit_action_batch", arguments: { actions: [{ type: "grep_pattern", pattern: "x" }] } }],
-				};
-			},
+			complete: async () => ({
+				stopReason: "stop",
+				content: [{ type: "text", text: 'Here is the batch:\n```json\n{"actions":[{"type":"read_lines","path":"src/index.ts"}]}\n```' }],
+			}),
 		});
-
 		const payload = await planBatchWithGrounding(deps);
-		expect(calls).toBe(2);
-		expect(payload.actions[0]?.type).toBe("grep_pattern");
+		expect(payload.actions[0]?.type).toBe("read_lines");
+	});
+
+	it("throws when the model returns no JSON on the final turn", async () => {
+		const deps = baseDeps({
+			config: resolveBatchQueueConfig({}, { groundingTurns: 0 }),
+			complete: async () => ({
+				stopReason: "stop",
+				content: [{ type: "text", text: "I cannot plan a batch." }],
+			}),
+		});
+		await expect(planBatchWithGrounding(deps)).rejects.toThrow("planning model did not return a batch plan");
 	});
 
 	it("throws when the model never submits", async () => {
