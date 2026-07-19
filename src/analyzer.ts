@@ -269,6 +269,47 @@ export function assertObjectiveMutationPolicy(
 }
 
 /**
+ * Resolve the planning model, tolerating custom provider deployment ids that are
+ * absent from the static model catalog (e.g. Azure OpenAI deployment names).
+ *
+ * Pi already fully resolves the driver model from the active session, so when the
+ * planner is the driver we reuse it directly; when a configured executor targets a
+ * custom deployment on the same provider we clone the driver's transport config
+ * (baseUrl, api, compat, auth provider) and only swap the model id.
+ *
+ * The clone disables reasoning: a custom deployment's reasoning-continuity support
+ * is unknown, and some (e.g. non-OpenAI models served via Azure OpenAI, such as
+ * grok) reject the `reasoning.encrypted_content` include that Pi sends for reasoning
+ * models, which would otherwise hard-fail every planner request.
+ */
+export function resolvePlanningModel(
+	planningRef: { readonly provider: string; readonly id: string },
+	driverModel: Model<Api>,
+	modelRegistry: ModelRegistry,
+): Model<Api> {
+	const found = modelRegistry.find(planningRef.provider, planningRef.id);
+	if (found) {
+		return found;
+	}
+
+	if (planningRef.provider === driverModel.provider) {
+		if (planningRef.id === driverModel.id) {
+			return driverModel;
+		}
+		return {
+			...driverModel,
+			id: planningRef.id,
+			name: planningRef.id,
+			reasoning: false,
+		};
+	}
+
+	throw new Error(
+		`planning model not found: ${planningRef.provider}/${planningRef.id}`,
+	);
+}
+
+/**
  * Plans a batch from an objective using the session driver / planner model by default,
  * or the configured cheap execution model when set.
  */
@@ -284,16 +325,11 @@ export async function analyzeBatchObjective(
 		{ provider: driverModel.provider, id: driverModel.id },
 		config,
 	);
-	const planningModel: Model<Api> | undefined = modelRegistry.find(
-		planningRef.provider,
-		planningRef.id,
+	const planningModel: Model<Api> = resolvePlanningModel(
+		planningRef,
+		driverModel,
+		modelRegistry,
 	);
-
-	if (!planningModel) {
-		throw new Error(
-			`planning model not found: ${planningRef.provider}/${planningRef.id}`,
-		);
-	}
 
 	const auth = await modelRegistry.getApiKeyAndHeaders(planningModel);
 	if (!auth.ok) {

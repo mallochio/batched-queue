@@ -12,10 +12,9 @@ This plan measures **performance and interaction efficiency**, not general model
 
 ## Current repository state
 
-- Repository: `/tmp/batched-queue`
-- Branch: `main`
-- Current commit: `53270f2 Improve batch queue positioning and add benchmark plans`
-- Pi version used during planning: `0.80.6`
+- Repository: `/home/ubuntu/repos/batched-queue`
+- Benchmark branch: `devin/benchmark-pi-batched-queue`
+- Pi version used for validation: `0.80.3`
 - Extension entry point: `src/extension.ts`
 - Existing headless tests:
   - `tests/headless-test.ts`
@@ -25,14 +24,20 @@ This plan measures **performance and interaction efficiency**, not general model
   - `DETERMINISTIC-PLAN.md`
   - `MODEL-MEDIATED-PLAN.md`
   - `RESULTS-TEMPLATE.md`
+  - `harness/README.md`
+
+The current harness contains 24 deterministic scenarios (`H1`–`H24`) and
+three primary conditions: native sequential, explicit batch, and objective
+batch. These are controlled fixture tasks; they are not Terminal-Bench 2.1 or
+SWE-bench tasks.
 
 ## First actions for the next session
 
 ```bash
-cd /tmp/batched-queue
+cd /home/ubuntu/repos/batched-queue
 git status --short --branch
-npx tsc --noEmit
-pi --version
+bun run typecheck
+bun node_modules/.bin/pi --version
 ```
 
 Use a clean temporary fixture for every run. Do not benchmark by allowing the model to edit the batched-queue repository itself.
@@ -77,6 +82,27 @@ pi \
 For a mutation scenario, add `edit,write` to the native allowlist. Keep the default benchmark read/check-only so both conditions have equivalent authority.
 
 Do not use `--print` for the primary measurements: JSON mode exposes the event stream needed for instrumentation.
+
+## Validated Azure matrix
+
+The provider-validated configuration is:
+
+```text
+driver:   azure-openai-responses/gpt-5.6-luna
+executor: azure-openai-responses/grok-4.3
+thinking: high / high
+Pi:       0.80.3
+```
+
+Azure objective mode requires the custom-deployment fallback in
+`src/analyzer.ts`. Same-provider custom executor ids are resolved from the
+active driver's transport configuration; reasoning is disabled on the clone
+for deployments that reject encrypted reasoning content.
+
+The 144-episode validation run cost $2.99 in reported usage and produced
+directional results only: native 71% success, explicit batch 83%, and
+objective batch 77%. Three runs timed out. Do not present these figures as
+external-benchmark results or statistically conclusive marketing claims.
 
 ## Conditions
 
@@ -185,6 +211,21 @@ verification result and changed file.
 ```
 
 Run this only after the read/check benchmark is stable. Native and batch conditions must have equivalent edit authority.
+
+## External benchmark next phase
+
+After the controlled suite is hardened:
+
+1. Select Terminal-Bench tasks with deterministic tests and no network
+   dependency; record the exact task revision and container image.
+2. Run native and explicit batch first with the same driver model, permissions,
+   timeout, and paired fresh containers. Keep objective mode separate because
+   it adds planner-model behavior and cost.
+3. Start with one pass per task, then repeat only the primary dependent subset
+   if the effect is promising. Do not call the controlled fixture results a
+   Terminal-Bench result.
+4. Add a small SWE-bench subset only after the Terminal-Bench adapter and
+   validator accounting are stable.
 
 ## JSON event extraction
 
