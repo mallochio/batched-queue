@@ -266,6 +266,23 @@ more validator-checked tasks with fewer orchestration calls. They do not show
 that the underlying language model became intrinsically smarter. Objective mode
 also adds planner latency and was less reliable in this initial study.
 
+A follow-up provider validation used the same 24-task deterministic fixture
+suite with Azure OpenAI, `gpt-5.6-luna` as the driver, and Azure's `grok-4.3`
+deployment as the objective executor. Across 144 episodes and two observations
+per cell, the aggregate results were:
+
+| condition | verified success | median tool calls | median cost |
+| --- | ---: | ---: | ---: |
+| native sequential | 71% | 2 | $0.0131 |
+| explicit `batch_queue` | 83% | 1 | $0.0132 |
+| objective `batch_queue` | 77% | 1 | $0.0099 |
+
+This follow-up is still pilot-scale: three episodes timed out, each cell has
+only two observations, and the suite is custom rather than Terminal-Bench or
+SWE-bench. It validates the Azure provider path and supports the same
+directional interaction-compression hypothesis; it is not external benchmark
+evidence or proof that the underlying model became intrinsically smarter.
+
 Before using the numbers as marketing claims, replace wording-based predicates
 with hidden filesystem/command validators, directly account for internal
 objective-planner usage, and repeat on a fresh held-out task set. See
