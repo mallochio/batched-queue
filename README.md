@@ -240,6 +240,38 @@ Use `bindTo` when a later action needs an earlier observation:
 
 Do **not** use `batch_queue` for a single obvious read/search/command, independent parallel reads/searches, destructive commands, long-running commands, interactive commands, or anything that needs user approval. Prefer `multi_tool_use.parallel` instead for independent parallel reads/searches. File actions are workspace-scoped unless configured otherwise.
 
+## Benchmark status
+
+The repository includes an executable Pi benchmark harness under
+[`benchmarks/harness/`](./benchmarks/harness/). It compares native sequential
+tools, explicit `batch_queue` actions, and objective-planned batches on fresh
+deterministic fixtures while recording task verification, model turns, tool
+calls, actions, tokens, cost, latency, result bytes, retries, and fast-fail
+metadata.
+
+The initial Luna study used 24 tasks, two observations per task/condition,
+`gpt-5.6-luna` at Pi `xhigh`, and `gpt-5.4-mini` at high for objective
+planning. It cost $6.05 in reported API usage across 144 episodes:
+
+| condition | verified success | median tool calls |
+| --- | ---: | ---: |
+| native sequential | 72.9% | 2.5 |
+| explicit `batch_queue` | 83.3% | 1.0 |
+| objective `batch_queue` | 64.6% | 2.5 |
+
+These are directional results, not a statistically conclusive claim. They
+support the hypothesis that explicit batching can improve **effective agent
+capability** on longer dependent coding workflows: the same driver completed
+more validator-checked tasks with fewer orchestration calls. They do not show
+that the underlying language model became intrinsically smarter. Objective mode
+also adds planner latency and was less reliable in this initial study.
+
+Before using the numbers as marketing claims, replace wording-based predicates
+with hidden filesystem/command validators, directly account for internal
+objective-planner usage, and repeat on a fresh held-out task set. See
+[`benchmarks/harness/README.md`](./benchmarks/harness/README.md) for the
+reproducible protocol.
+
 ## Research inspirations
 
 The **primary architectural inspiration** for `batch_queue` is [**RGB-Agent / Read-Grep-Bash Agent**](https://github.com/alexisfox7/RGB-Agent), an agent for [ARC-AGI-3](https://three.arcprize.org/). Its README reports completing all three preview games in **1,069 actions**, described there as the **lowest publicly reported count**. This is a public result reported by the project, not a claim that it won an official global leaderboard.
