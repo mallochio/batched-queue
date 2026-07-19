@@ -13,6 +13,8 @@ This is intentionally narrower than a claim that `batch_queue` is faster for eve
 - [`DETERMINISTIC-PLAN.md`](./DETERMINISTIC-PLAN.md) — API-key-free executor and safety benchmark suitable for CI.
 - [`MODEL-MEDIATED-PLAN.md`](./MODEL-MEDIATED-PLAN.md) — controlled Pi/OpenCode comparison using a fixed model and isolated fixtures.
 - [`PI-HEADLESS-HANDOFF.md`](./PI-HEADLESS-HANDOFF.md) — executable handoff for measuring Pi JSON-mode sessions, token usage, latency, and correctness.
+- [`harness/README.md`](./harness/README.md) — current executable commands,
+  validated Azure configuration, and pre-external-benchmark checklist.
 - [`RESULTS-TEMPLATE.md`](./RESULTS-TEMPLATE.md) — report template; do not fill it with unverified or cherry-picked results.
 
 ## Conditions to compare
@@ -46,3 +48,6 @@ This is intentionally narrower than a claim that `batch_queue` is faster for eve
 - Report failed runs and exclusions explicitly.
 - Do not claim a speedup without accounting for objective-planning model calls.
 - Do not compare `batch_queue` against parallel execution on a dependent workload as if they were interchangeable.
+- The current H1–H24 suite is a controlled deterministic fixture suite, not
+  Terminal-Bench 2.1 or SWE-bench. Use it for mechanism and provider
+  validation; use a public benchmark for external capability claims.
