@@ -32,6 +32,8 @@ interface CliArgs {
 	executorModel: string | null;
 	provider: string;
 	thinking: string;
+	executorThinking: string;
+	maxCostUsd: number;
 	timeoutMs: number;
 	outDir: string;
 }
@@ -72,6 +74,8 @@ function parseArgs(argv: string[]): CliArgs {
 		executorModel: executorModel === "none" ? null : executorModel,
 		provider: map.get("provider") ?? "openai",
 		thinking: map.get("thinking") ?? "low",
+		executorThinking: map.get("executor-thinking") ?? "high",
+		maxCostUsd: Number(map.get("max-cost-usd") ?? 30),
 		timeoutMs: Number(map.get("timeout-ms") ?? 240000),
 		outDir: map.get("out") ?? defaultOut,
 	};
@@ -196,6 +200,7 @@ async function main(): Promise<void> {
 
 	const summaries: RunSummary[] = [];
 	let done = 0;
+	let observedCostUsd = 0;
 	for (const job of ordered) {
 		done++;
 		const scenario = scenarioById(job.scenario);
@@ -225,9 +230,17 @@ async function main(): Promise<void> {
 		const env: Record<string, string> = { ...(condition.env ?? {}) };
 		if (condition.id === "batch-objective" && args.executorModel) {
 			env.BATCH_QUEUE_EXECUTOR = args.executorModel;
+			env.BATCH_QUEUE_EXECUTOR_THINKING = args.executorThinking;
 		}
 
 		const tag = `${scenario.id}-${condition.id}-${job.run}`;
+		if (observedCostUsd >= args.maxCostUsd) {
+			console.error(
+				`\nStopping before ${tag}: observed outer cost ` +
+					`$${observedCostUsd.toFixed(4)} reached cap $${args.maxCostUsd.toFixed(2)}`,
+			);
+			break;
+		}
 		process.stderr.write(
 			`[${done}/${ordered.length}] ${tag} ... `,
 		);
@@ -254,6 +267,12 @@ async function main(): Promise<void> {
 			`${JSON.stringify(summary, null, 2)}\n`,
 		);
 		summaries.push(summary);
+		observedCostUsd += summary.usage.costUsd;
+		// Persist after every job so an interrupted long run remains resumable.
+		writeFileSync(
+			join(args.outDir, "runs.json"),
+			`${JSON.stringify(summaries, null, 2)}\n`,
+		);
 		fixture.cleanup();
 
 		process.stderr.write(
