@@ -123,14 +123,6 @@ interface ConditionMetrics {
 	perActionMs: number[];
 }
 
-interface ScenarioResult {
-	id: string;
-	label: string;
-	batched: ConditionMetrics;
-	unbatched: ConditionMetrics;
-	fileDigest: string;
-}
-
 // ── Batched runner ───────────────────────────────────────────────────────────
 
 async function runBatched(
@@ -422,96 +414,170 @@ const SCENARIOS: Scenario[] = [
 	},
 ];
 
+// ── Statistics ─────────────────────────────────────────────────────────────────
+
+function median(values: number[]): number {
+	if (values.length === 0) return 0;
+	const sorted = [...values].sort((a, b) => a - b);
+	const mid = Math.floor(sorted.length / 2);
+	return sorted.length % 2 === 0
+		? (sorted[mid - 1] + sorted[mid]) / 2
+		: sorted[mid];
+}
+
+function percentile(values: number[], p: number): number {
+	if (values.length === 0) return 0;
+	const sorted = [...values].sort((a, b) => a - b);
+	const idx = Math.min(
+		sorted.length - 1,
+		Math.max(0, Math.ceil((p / 100) * sorted.length) - 1),
+	);
+	return sorted[idx];
+}
+
+// ── Aggregated metrics ───────────────────────────────────────────────────────
+
+interface AggregatedMetrics {
+	condition: "batched" | "unbatched";
+	repCount: number;
+	passCount: number;
+	passRate: number;
+	medianDurationMs: number;
+	p95DurationMs: number;
+	medianExecutorCalls: number;
+	medianActionsRequested: number;
+	medianActionsCompleted: number;
+	medianResultBytes: number;
+	haltedCount: number;
+	medianPerActionMs: number[];
+	allPassed: boolean;
+	failedAssertions: number;
+}
+
+function aggregateMetrics(samples: ConditionMetrics[]): AggregatedMetrics {
+	const n = samples.length;
+	const passCount = samples.filter((s) => s.passed).length;
+	const durationValues = samples.map((s) => s.totalDurationMs);
+
+	// Median per-action timing across reps (each action position)
+	const maxActions = Math.max(...samples.map((s) => s.perActionMs.length));
+	const medianPerAction: number[] = [];
+	for (let i = 0; i < maxActions; i++) {
+		const atPos = samples.map((s) => s.perActionMs[i] ?? 0).filter((v) => v > 0);
+		medianPerAction.push(atPos.length > 0 ? median(atPos) : 0);
+	}
+
+	const failedAssertions = samples.reduce(
+		(sum, s) => sum + s.assertions.filter((a) => !a.pass).length,
+		0,
+	);
+
+	return {
+		condition: samples[0]?.condition ?? "batched",
+		repCount: n,
+		passCount,
+		passRate: n > 0 ? passCount / n : 0,
+		medianDurationMs: Math.round(median(durationValues) * 100) / 100,
+		p95DurationMs: Math.round(percentile(durationValues, 95) * 100) / 100,
+		medianExecutorCalls: median(samples.map((s) => s.executorCallCount)),
+		medianActionsRequested: median(samples.map((s) => s.totalActionsRequested)),
+		medianActionsCompleted: median(samples.map((s) => s.totalActionsCompleted)),
+		medianResultBytes: median(samples.map((s) => s.resultBytes)),
+		haltedCount: samples.filter((s) => s.haltedPrematurely).length,
+		medianPerActionMs: medianPerAction,
+		allPassed: passCount === n,
+		failedAssertions,
+	};
+}
+
 // ── Report ────────────────────────────────────────────────────────────────────
 
 function fmtMs(ms: number): string {
 	return ms >= 1000 ? `${(ms / 1000).toFixed(2)}s` : `${Math.round(ms)}ms`;
 }
 
-function fmtRatio(a: number, b: number): string {
-	if (b === 0) return "—";
-	const ratio = (a / b);
-	const sign = ratio > 1 ? "×" : "×";
-	return `${(ratio * 100).toFixed(0)}%`;
+function fmtPct(n: number): string {
+	return `${(n * 100).toFixed(0)}%`;
 }
 
-function renderReport(results: ScenarioResult[]): string {
+function renderReport(
+	allResults: Map<string, { id: string; label: string; batched: AggregatedMetrics; unbatched: AggregatedMetrics; fileDigest: string }>,
+): string {
 	const lines: string[] = [];
+	const entries = [...allResults.values()];
+
 	lines.push("# Deterministic benchmark report (D1–D7)");
 	lines.push("");
 	lines.push(`Run: ${new Date().toISOString().slice(0, 19).replace("T", " ")}`);
+	lines.push(`Repetitions: ${entries[0]?.batched.repCount ?? 1} per condition`);
 	lines.push("");
-	lines.push(`| Scenario | Condition | Exec calls | Actions done/req | Wall time | Result bytes | Halted | Passed |`);
-	lines.push(`| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |`);
 
-	for (const s of results) {
+	// Main results table
+	lines.push("## Results");
+	lines.push("");
+	lines.push(`| Scenario | Condition | Reps | Pass rate | Median wall | P95 wall | Median exec calls | Actions (med) | Result bytes | Halted runs |`);
+	lines.push(`| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |`);
+
+	for (const s of entries) {
 		for (const m of [s.batched, s.unbatched]) {
-			const haltStr = m.haltedPrematurely ? `${m.haltReason ?? "yes"}@${m.haltedAtIndex}` : "no";
-			const actionStr = `${m.totalActionsCompleted}/${m.totalActionsRequested}`;
 			lines.push(
-				`| ${s.id} ${m.condition} | ${m.condition} | ${m.executorCallCount} | ${actionStr} | ${fmtMs(m.totalDurationMs)} | ${(m.resultBytes / 1024).toFixed(1)}KB | ${haltStr} | ${m.passed ? "✅" : "❌"} |`,
+				`| ${s.id} | ${m.condition} | ${m.repCount} | ${fmtPct(m.passRate)} | ${fmtMs(m.medianDurationMs)} | ${fmtMs(m.p95DurationMs)} | ${m.medianExecutorCalls} | ${m.medianActionsCompleted}/${m.medianActionsRequested} | ${(m.medianResultBytes / 1024).toFixed(1)}KB | ${m.haltedCount} |`,
 			);
 		}
 	}
 
+	// Per-action timing table (median across reps)
 	lines.push("");
-	lines.push("## Per-action timing");
+	lines.push("## Per-action timing (median across reps)");
 	lines.push("");
-	lines.push(`| Scenario | Condition | Per-action duration (ms) |`);
+	lines.push(`| Scenario | Condition | Per-action median (ms) |`);
 	lines.push(`| --- | --- | --- |`);
-	for (const s of results) {
-		const bStr = s.batched.perActionMs.map((ms) => `${ms}ms`).join(", ");
-		const uStr = s.unbatched.perActionMs.map((ms) => `${ms}ms`).join(", ");
-		lines.push(`| ${s.id} | batched | ${bStr} |`);
-		lines.push(`| ${s.id} | unbatched | ${uStr} |`);
+	for (const s of entries) {
+		const bStr = s.batched.medianPerActionMs.map((ms) => `${Math.round(ms)}ms`).join(", ");
+		const uStr = s.unbatched.medianPerActionMs.map((ms) => `${Math.round(ms)}ms`).join(", ");
+		if (bStr) lines.push(`| ${s.id} | batched | ${bStr} |`);
+		if (uStr) lines.push(`| ${s.id} | unbatched | ${uStr} |`);
 	}
 
+	// Reduction summary
 	lines.push("");
-	lines.push("## Assertion details");
+	lines.push("## Executor-call reduction (batched vs unbatched)");
 	lines.push("");
-	for (const s of results) {
-		for (const m of [s.batched, s.unbatched]) {
-			const fails = m.assertions.filter((a) => !a.pass);
-			if (fails.length > 0) {
-				lines.push(`### ${s.id} ${m.condition} — ${fails.length} assertion(s) failed`);
-				for (const f of fails) {
-					lines.push(`- ❌ **${f.name}** ${f.detail ? `— ${f.detail}` : ""}`);
-				}
-			} else {
-				lines.push(`### ${s.id} ${m.condition} — all assertions passed ✅`);
-			}
-		}
+	for (const s of entries) {
+		const bCalls = s.batched.medianExecutorCalls;
+		const uCalls = s.unbatched.medianExecutorCalls;
+		const reduction = uCalls > 0 ? ((1 - bCalls / uCalls) * 100).toFixed(0) : "—";
+		lines.push(`- **${s.id}**: ${bCalls} vs ${uCalls} calls (${reduction}% reduction)`);
 	}
 
-	// Summary
-	const totals = results.flatMap((s) => [s.batched, s.unbatched]);
-	const totalPassed = totals.filter((m) => m.passed).length;
+	// Acceptance criteria
+	lines.push("");
+	lines.push("## Acceptance criteria");
+	lines.push("");
+	for (const s of entries) {
+		const bOk = s.batched.allPassed;
+		const uOk = s.unbatched.allPassed;
+		const fails = s.batched.failedAssertions + s.unbatched.failedAssertions;
+		const ok = bOk && uOk;
+		lines.push(`- **${s.id}** (${s.label}): ${ok ? "✅ PASS" : "❌ FAIL"}  (batched: ${bOk ? "✅" : "❌"}, unbatched: ${uOk ? "✅" : "❌"}, ${fails} failed assertions)`);
+	}
+
+	// Summary stats
+	const totalRuns = entries.reduce((s, e) => s + e.batched.repCount + e.unbatched.repCount, 0);
+	const totalFails = entries.reduce(
+		(s, e) => s + (e.batched.repCount - e.batched.passCount) + (e.unbatched.repCount - e.unbatched.passCount),
+		0,
+	);
 	lines.push("");
 	lines.push("## Summary");
 	lines.push("");
-	lines.push(`- Scenarios: ${results.length} (${results.map((r) => r.id).join(", ")})`);
-	lines.push(`- Conditions per scenario: 2 (batched, unbatched)`);
-	lines.push(`- Total condition runs: ${totals.length}`);
-	lines.push(`- Passed: ${totalPassed} / ${totals.length}`);
-
-	const executorCallRatio = results.map(
-		(s) => s.batched.executorCallCount / s.unbatched.executorCallCount,
-	);
-	const avgRatio = executorCallRatio.reduce((a, b) => a + b, 0) / executorCallRatio.length;
-	lines.push(`- Mean executor-call reduction (batched vs unbatched): ${(avgRatio * 100).toFixed(0)}%`);
-
-	lines.push("");
-	lines.push("## Acceptance criteria");
-	results.forEach((s) => {
-		const bOk = s.batched.passed;
-		const uOk = s.unbatched.passed;
-		const ok = bOk && uOk;
-		lines.push(`- **${s.id}** (${s.label}): ${ok ? "✅ PASS" : "❌ FAIL"}  (batched: ${bOk ? "✅" : "❌"}, unbatched: ${uOk ? "✅" : "❌"})`);
-	});
-
-	lines.push("");
-	lines.push(`Fixture digest: ${results[0]?.fileDigest ?? "unknown"}`);
-	lines.push(`Generated at: ${new Date().toISOString()}`);
+	lines.push(`- Scenarios: ${entries.length} (${entries.map((r) => r.id).join(", ")})`);
+	lines.push(`- Reps per condition: ${entries[0]?.batched.repCount ?? 1}`);
+	lines.push(`- Total condition runs: ${totalRuns}`);
+	lines.push(`- Failed runs: ${totalFails}`);
+	lines.push(`- Overall pass rate: ${fmtPct(1 - totalFails / totalRuns)}`);
+	lines.push(`- Fixture digest: ${entries[0]?.fileDigest ?? "unknown"}`);
+	lines.push(`- Generated at: ${new Date().toISOString()}`);
 
 	return lines.join("\n");
 }
@@ -537,42 +603,67 @@ async function runCondition(
 	}
 }
 
-async function runScenario(scenario: Scenario): Promise<ScenarioResult> {
-	const [batched, unbatched] = await Promise.all([
-		runCondition(scenario, "batched"),
-		runCondition(scenario, "unbatched"),
-	]);
-
-	const REPO = resolve(import.meta.dir, "..", "..");
-	const fixtureDir = mkdtempSync(join(REPO, "tests/.tmp/bq-det-"));
-	createFixture(fixtureDir);
-	const digest = fixtureDigest(fixtureDir);
-	rmSync(fixtureDir, { recursive: true, force: true });
-
-	return { id: scenario.id, label: scenario.label, batched, unbatched, fileDigest: digest };
-}
-
 async function main(): Promise<void> {
-	const emitJson = process.argv.includes("--json");
-	const results: ScenarioResult[] = [];
+	const reps = parseReps();
+	const allResults = new Map<string, { id: string; label: string; batched: AggregatedMetrics; unbatched: AggregatedMetrics; fileDigest: string }>();
+
+	let totalRuns = 0;
+	const tStart = performance.now();
 
 	for (const scenario of SCENARIOS) {
-		const result = await runScenario(scenario);
-		results.push(result);
+		const batchedSamples: ConditionMetrics[] = [];
+		const unbatchedSamples: ConditionMetrics[] = [];
 
-		if (emitJson) {
-			process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+		for (let rep = 0; rep < reps; rep++) {
+			batchedSamples.push(await runCondition(scenario, "batched"));
+			unbatchedSamples.push(await runCondition(scenario, "unbatched"));
+		}
+
+		const digest = fixtureDigest(
+			mkdtempSync(join(resolve(import.meta.dir, "..", ".."), "tests/.tmp/bq-det-")),
+		);
+
+		allResults.set(scenario.id, {
+			id: scenario.id,
+			label: scenario.label,
+			batched: aggregateMetrics(batchedSamples),
+			unbatched: aggregateMetrics(unbatchedSamples),
+			fileDigest: digest,
+		});
+
+		totalRuns += reps * 2;
+	}
+
+	const tElapsed = ((performance.now() - tStart) / 1000).toFixed(1);
+
+	const report = renderReport(allResults);
+	console.log(report);
+	process.stderr.write(`\nCompleted ${totalRuns} runs in ${tElapsed}s\n`);
+
+	// Exit non-zero if any scenario had a failing rep
+	let anyFail = false;
+	for (const r of allResults.values()) {
+		if (!r.batched.allPassed || !r.unbatched.allPassed) {
+			anyFail = true;
 		}
 	}
-
-	const report = renderReport(results);
-	console.log(report);
-
-	const failCount = results.filter((r) => !r.batched.passed || !r.unbatched.passed).length;
-	if (failCount > 0) {
-		console.error(`\n❌ ${failCount} scenario(s) failed acceptance criteria.`);
+	if (anyFail) {
 		process.exit(1);
 	}
+}
+
+function parseReps(): number {
+	for (let i = 0; i < process.argv.length - 1; i++) {
+		if (process.argv[i] === "--reps") {
+			const n = parseInt(process.argv[i + 1], 10);
+			if (isNaN(n) || n < 1) {
+				console.error("--reps must be a positive integer");
+				process.exit(1);
+			}
+			return n;
+		}
+	}
+	return 1;
 }
 
 main().catch((err) => {
