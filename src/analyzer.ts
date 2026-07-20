@@ -205,7 +205,7 @@ async function runInspectTool(
 	const gitRoot = findWorkspaceRoot(cwd);
 	if (name === "inspect_read") {
 		const result = executeReadLines(
-			{ type: "read_lines", path: String(args.path ?? ""), startLine: args.startLine as number | undefined, endLine: args.endLine as number | undefined },
+			{ type: "read_lines", path: typeof args.path === "string" ? args.path : "", startLine: args.startLine as number | undefined, endLine: args.endLine as number | undefined },
 			0,
 			{ workspaceRoot: cwd, gitWorkspaceRoot: gitRoot, limits: DEFAULT_OUTPUT_LIMITS },
 		);
@@ -214,7 +214,7 @@ async function runInspectTool(
 	const result = await executeGrepPattern(
 		{
 			type: "grep_pattern",
-			pattern: String(args.pattern ?? ""),
+			pattern: typeof args.pattern === "string" ? args.pattern : "",
 			path: args.path as string | undefined,
 			glob: args.glob as string | undefined,
 			caseSensitive: args.caseSensitive as boolean | undefined,
@@ -232,7 +232,7 @@ async function runInspectTool(
  * Extract a batch JSON payload from the model's text response.
  * Tries direct parse, code blocks, and balanced-brace extraction.
  */
-function extractBatchFromText(text: string): unknown | undefined {
+function extractBatchFromText(text: string): unknown {
 	const trimmed = text.trim();
 	if (!trimmed) return undefined;
 
@@ -242,7 +242,7 @@ function extractBatchFromText(text: string): unknown | undefined {
 	}
 
 	// Code block
-	const codeBlockMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
+	const codeBlockMatch = /```(?:json)?\s*([\s\S]*?)```/.exec(trimmed);
 	if (codeBlockMatch?.[1]) {
 		try { return JSON.parse(codeBlockMatch[1].trim()); } catch { /* not JSON */ }
 	}
@@ -265,8 +265,8 @@ export function assertObjectiveMutationPolicy(
 		return;
 	}
 
-	const mutation = payload.actions.find((action) => action.type === "apply_diff");
-	if (mutation) {
+	const hasMutation = payload.actions.some((action) => action.type === "apply_diff");
+	if (hasMutation) {
 		throw new Error("objective-planned apply_diff is disabled; pass explicit actions or enable allowObjectiveMutations");
 	}
 }

@@ -135,7 +135,13 @@ export function registerBatchedQueueExtension(
 						const ok = action.success ? "✓" : "✗";
 						const color = action.success ? "success" : "error";
 						const exit = action.exitCode === 0 ? "" : ` exit=${action.exitCode}`;
-						const label = `${theme.fg(color, ok)} ${theme.fg("muted", `[${action.index}]`)} ${theme.fg("toolOutput", action.type)}${theme.fg(color, exit)}`;
+						const label =
+							theme.fg(color, ok) +
+							" " +
+							theme.fg("muted", "[" + String(action.index) + "]") +
+							" " +
+							theme.fg("toolOutput", action.type) +
+							theme.fg(color, exit);
 						lines.push(label);
 
 						let bodyLines: string[] = [];
@@ -250,7 +256,7 @@ export function registerBatchedQueueExtension(
 	});
 }
 
-export default function (pi: ExtensionAPI) {
+export default function initializeBatchedQueueExtension(pi: ExtensionAPI) {
 	registerBatchedQueueExtension(pi, {
 		// Uncomment or override via env vars (see config.ts):
 		// maxBatchActions: 15,

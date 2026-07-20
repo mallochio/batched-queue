@@ -1,9 +1,9 @@
 import {
-	BASH_TIMEOUT_EXIT_CODE,
 	DEFAULT_COMMAND_TIMEOUT_MS,
 	DEFAULT_OUTPUT_LIMITS,
 	type OutputLimits,
 } from "./constants";
+export { BASH_TIMEOUT_EXIT_CODE } from "./constants.js";
 import type { ActionBatchPayload } from "./payload";
 import type {
 	ActionExecutionResult,
@@ -62,7 +62,7 @@ export class BatchQueueRunner {
 	private readonly env: Record<string, string>;
 	private readonly pathSecurity: PathSecurityConfig;
 	private gitWorkspaceRoot: string;
-	private session: BatchQueueSessionState;
+	private readonly session: BatchQueueSessionState;
 	private shell: PersistentShell | null = null;
 	private shellStale = false;
 
@@ -221,5 +221,3 @@ export function createBatchQueueRunner(
 ): BatchQueueRunner {
 	return new BatchQueueRunner(sessionId, workspaceRoot, options);
 }
-
-export { BASH_TIMEOUT_EXIT_CODE };

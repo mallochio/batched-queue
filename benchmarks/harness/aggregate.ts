@@ -118,6 +118,129 @@ function fmt(n: number, digits = 0): string {
 	});
 }
 
+function renderConfigSection(manifest: Manifest, rows: RunSummary[]): string {
+	const timedOut = rows.filter((r) => r.timedOut).length;
+	const lines = [
+		"## Configuration",
+		"",
+		`- date: ${manifest.date}`,
+		`- provider: ${manifest.provider}`,
+		`- driver model: ${manifest.driverModel}`,
+		`- objective executor model: ${manifest.executorModel ?? "session driver"}`,
+		`- thinking: ${manifest.thinking}`,
+		`- repetitions per cell: ${manifest.repetitions}`,
+		`- pi version: ${manifest.piVersion}`,
+		`- commit: ${manifest.commit}`,
+		`- total runs: ${rows.length} (${timedOut} timed out)`,
+		"",
+		"> Pilot-scale sample. Per the benchmark reporting rules, a headline " +
+			"speedup claim needs \u226520 reps/cell and separated cold/warm-cache runs. " +
+			"Treat small-n medians as directional.",
+		"",
+	];
+	return lines.join("\n");
+}
+
+function renderScenarioTable(c: CellStats): string {
+	return (
+		`| ${c.condition} | ${c.n} | ${pct(c.successRate)} | ` +
+		`${fmt(c.medianTurns)} | ${fmt(c.medianToolCalls)} | ${fmt(c.medianActions)} | ` +
+		`${c.medianActionCompression.toFixed(2)}x | ` +
+		`$${c.medianCost.toFixed(5)} | $${c.medianPlannerCost.toFixed(5)} | $${c.medianTotalCost.toFixed(5)} | ` +
+		`${fmt(c.medianResultBytes)} | ${(c.medianElapsedMs / 1000).toFixed(1)} |`
+	);
+}
+
+function renderReductionTable(baseline: CellStats, c: CellStats): string {
+	return (
+		`| ${c.condition} | ${reduction(baseline.medianTurns, c.medianTurns)} | ` +
+		`${reduction(baseline.medianToolCalls, c.medianToolCalls)} | ` +
+		`${reduction(baseline.medianTotalCost, c.medianTotalCost)} | ` +
+		`${reduction(baseline.medianResultBytes, c.medianResultBytes)} |`
+	);
+}
+
+function renderScenarioSection(
+	scenario: string,
+	conditions: string[],
+	cellMap: Map<string, CellStats>,
+	rows: RunSummary[],
+): string {
+	const label = rows.find((r) => r.scenario === scenario)?.scenario ?? scenario;
+	const baseline = cellMap.get(`${scenario}|native`);
+	const tableRows = ["", `## Scenario ${label}`, ""];
+	tableRows.push(
+		"| condition | n | success | med turns | med tool calls | med actions | action compression | med cost (USD) | med planner cost (USD) | med total cost (USD) | med result bytes | med latency (s) |",
+	);
+	tableRows.push(
+		"| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+	);
+
+	for (const condition of conditions) {
+		const c = cellMap.get(`${scenario}|${condition}`);
+		if (c) tableRows.push(renderScenarioTable(c));
+	}
+	tableRows.push("");
+
+	if (baseline) {
+		tableRows.push("Reduction vs native (positive = fewer/cheaper):");
+		tableRows.push("");
+		tableRows.push("| condition | turns | tool calls | total cost | result bytes |");
+		tableRows.push("| --- | --- | --- | --- | --- |");
+		for (const condition of conditions) {
+			if (condition === "native") continue;
+			const c = cellMap.get(`${scenario}|${condition}`);
+			if (c) tableRows.push(renderReductionTable(baseline, c));
+		}
+		tableRows.push("");
+	}
+
+	return tableRows.join("\n");
+}
+
+function renderAggregateRow(condition: string, rows: RunSummary[]): string {
+	const condRows = rows.filter((r) => r.condition === condition);
+	if (condRows.length === 0) return "";
+	const driverCost = median(condRows.map((r) => r.usage.costUsd));
+	const plannerCost = median(condRows.map((r) => r.plannerUsage?.costUsd ?? 0));
+	return (
+		`| ${condition} | ${pct(mean(condRows.map((r) => (r.verificationPassed ? 1 : 0))))} | ` +
+		`${fmt(median(condRows.map((r) => r.modelTurns)))} | ` +
+		`${fmt(median(condRows.map((r) => r.toolCalls)))} | ` +
+		`$${driverCost.toFixed(5)} | $${plannerCost.toFixed(5)} | $${(driverCost + plannerCost).toFixed(5)} | ` +
+		`${fmt(median(condRows.map((r) => r.resultBytes)))} |`
+	);
+}
+
+function renderAggregateSection(conditions: string[], rows: RunSummary[]): string {
+	const lines = [
+		"## Aggregate across scenarios",
+		"",
+		"| condition | success | med turns | med tool calls | driver cost (USD) | planner cost (USD) | total cost (USD) | med result bytes |",
+		"| --- | --- | --- | --- | --- | --- | --- | --- |",
+	];
+	for (const condition of conditions) {
+		const row = renderAggregateRow(condition, rows);
+		if (row) lines.push(row);
+	}
+	return lines.join("\n");
+}
+
+function renderInterpretation(): string {
+	return (
+		"## Interpretation\n\n" +
+		"The hypothesis under test is that for short dependent repository " +
+		"workflows, `batch_queue` reduces model/tool interaction turns and " +
+		"context overhead while preserving correctness. Read the per-scenario " +
+		"tables above: batch conditions should show fewer model/tool turns " +
+		"for dependent work at equal success. Result bytes are reported " +
+		"separately because the queue intentionally returns structured action " +
+		"evidence and can therefore be larger than terse native output. " +
+		"Batch-objective may cost more because planning is an extra " +
+		"model-mediated step.\n"
+	);
+}
+
 function buildReport(
 	manifest: Manifest,
 	cells: CellStats[],
@@ -127,119 +250,24 @@ function buildReport(
 	const conditions = [...new Set(cells.map((c) => c.condition))];
 	const cellMap = new Map(cells.map((c) => [`${c.scenario}|${c.condition}`, c]));
 
-	const lines: string[] = [];
-	lines.push("# batched-queue Pi headless benchmark results");
-	lines.push("");
-	lines.push(
+	const sections = [
+		"# batched-queue Pi headless benchmark results",
+		"",
 		"Generated by `benchmarks/harness/aggregate.ts`. Numbers reflect the " +
 			"committed queue implementation with no behavioural changes.",
-	);
-	lines.push("");
-	lines.push("## Configuration");
-	lines.push("");
-	lines.push(`- date: ${manifest.date}`);
-	lines.push(`- provider: ${manifest.provider}`);
-	lines.push(`- driver model: ${manifest.driverModel}`);
-	lines.push(
-		`- objective executor model: ${manifest.executorModel ?? "session driver"}`,
-	);
-	lines.push(`- thinking: ${manifest.thinking}`);
-	lines.push(`- repetitions per cell: ${manifest.repetitions}`);
-	lines.push(`- pi version: ${manifest.piVersion}`);
-	lines.push(`- commit: ${manifest.commit}`);
-	lines.push(
-		`- total runs: ${rows.length} (${rows.filter((r) => r.timedOut).length} timed out)`,
-	);
-	lines.push("");
-	lines.push(
-		"> Pilot-scale sample. Per the benchmark reporting rules, a headline " +
-			"speedup claim needs \u226520 reps/cell and separated cold/warm-cache runs. " +
-			"Treat small-n medians as directional.",
-	);
-	lines.push("");
+		"",
+		renderConfigSection(manifest, rows),
+	];
 
 	for (const scenario of scenarios) {
-		const label =
-			rows.find((r) => r.scenario === scenario)?.scenario ?? scenario;
-		lines.push(`## Scenario ${label}`);
-		lines.push("");
-		lines.push(
-			"| condition | n | success | med turns | med tool calls | med actions | action compression | med cost (USD) | med planner cost (USD) | med total cost (USD) | med result bytes | med latency (s) |",
-		);
-		lines.push(
-			"| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
-		);
-		const baseline = cellMap.get(`${scenario}|native`);
-		for (const condition of conditions) {
-			const c = cellMap.get(`${scenario}|${condition}`);
-			if (!c) continue;
-			lines.push(
-				`| ${condition} | ${c.n} | ${pct(c.successRate)} | ` +
-					`${fmt(c.medianTurns)} | ${fmt(c.medianToolCalls)} | ${fmt(c.medianActions)} | ` +
-					`${c.medianActionCompression.toFixed(2)}x | ` +
-					`$${c.medianCost.toFixed(5)} | $${c.medianPlannerCost.toFixed(5)} | $${c.medianTotalCost.toFixed(5)} | ` +
-					`${fmt(c.medianResultBytes)} | ${(c.medianElapsedMs / 1000).toFixed(1)} |`,
-			);
-		}
-		lines.push("");
-		if (baseline) {
-			lines.push("Reduction vs native (positive = fewer/cheaper):");
-			lines.push("");
-			lines.push(
-				"| condition | turns | tool calls | total cost | result bytes |",
-			);
-			lines.push("| --- | --- | --- | --- | --- |");
-			for (const condition of conditions) {
-				if (condition === "native") continue;
-				const c = cellMap.get(`${scenario}|${condition}`);
-				if (!c) continue;
-				lines.push(
-					`| ${condition} | ${reduction(baseline.medianTurns, c.medianTurns)} | ` +
-						`${reduction(baseline.medianToolCalls, c.medianToolCalls)} | ` +
-						`${reduction(baseline.medianTotalCost, c.medianTotalCost)} | ` +
-						`${reduction(baseline.medianResultBytes, c.medianResultBytes)} |`,
-				);
-			}
-			lines.push("");
-		}
+		sections.push(renderScenarioSection(scenario, conditions, cellMap, rows));
 	}
 
-	// Aggregate across scenarios per condition.
-	lines.push("## Aggregate across scenarios");
-	lines.push("");
-	lines.push(
-		"| condition | success | med turns | med tool calls | driver cost (USD) | planner cost (USD) | total cost (USD) | med result bytes |",
-	);
-	lines.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
-	for (const condition of conditions) {
-		const condRows = rows.filter((r) => r.condition === condition);
-		if (condRows.length === 0) continue;
-		const driverCost = median(condRows.map((r) => r.usage.costUsd));
-		const plannerCost = median(condRows.map((r) => r.plannerUsage?.costUsd ?? 0));
-		lines.push(
-			`| ${condition} | ${pct(mean(condRows.map((r) => (r.verificationPassed ? 1 : 0))))} | ` +
-				`${fmt(median(condRows.map((r) => r.modelTurns)))} | ` +
-				`${fmt(median(condRows.map((r) => r.toolCalls)))} | ` +
-				`$${driverCost.toFixed(5)} | $${plannerCost.toFixed(5)} | $${(driverCost + plannerCost).toFixed(5)} | ` +
-				`${fmt(median(condRows.map((r) => r.resultBytes)))} |`,
-		);
-	}
-	lines.push("");
-	lines.push("## Interpretation");
-	lines.push("");
-	lines.push(
-		"The hypothesis under test is that for short dependent repository " +
-			"workflows, `batch_queue` reduces model/tool interaction turns and " +
-			"context overhead while preserving correctness. Read the per-scenario " +
-			"tables above: batch conditions should show fewer model/tool turns " +
-			"for dependent work at equal success. Result bytes are reported " +
-			"separately because the queue intentionally returns structured action " +
-			"evidence and can therefore be larger than terse native output. " +
-			"Batch-objective may cost more because planning is an extra " +
-			"model-mediated step.",
-	);
-	lines.push("");
-	return `${lines.join("\n")}\n`;
+	sections.push(renderAggregateSection(conditions, rows));
+	sections.push("");
+	sections.push(renderInterpretation());
+
+	return `${sections.join("\n")}\n`;
 }
 
 function main(): void {

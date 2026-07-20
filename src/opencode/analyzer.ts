@@ -112,12 +112,10 @@ function buildObjectivePrompt(objective: string, config: ResolvedBatchQueueConfi
 }
 
 function toPlainJsonSchema(config: ResolvedBatchQueueConfig): Record<string, unknown> {
-	return JSON.parse(
-		JSON.stringify(
-			createSubmitActionBatchToolSchema(config.maxBatchActions, {
-				allowMutatingActions: config.allowObjectiveMutations,
-			}),
-		),
+	return structuredClone(
+		createSubmitActionBatchToolSchema(config.maxBatchActions, {
+			allowMutatingActions: config.allowObjectiveMutations,
+		}),
 	) as Record<string, unknown>;
 }
 

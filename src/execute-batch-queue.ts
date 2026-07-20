@@ -42,7 +42,7 @@ export function createRunnerMap(): Map<string, BatchQueueRunner> {
 }
 
 export async function disposeAllRunners(runners: Map<string, BatchQueueRunner>): Promise<void> {
-	for (const sessionId of [...runners.keys()]) {
+	for (const sessionId of runners.keys()) {
 		const runner = runners.get(sessionId);
 		if (runner) {
 			await runner.dispose();

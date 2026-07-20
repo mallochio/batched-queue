@@ -11,7 +11,6 @@ import {
 	executeBatchQueue,
 } from "../execute-batch-queue.js";
 import { loadOpenCodeFileConfig } from "../file-config.js";
-import { configuredExecutionModelDescription } from "../planning-model.js";
 import { buildBatchQueueDescription } from "../tool-description.js";
 import { analyzeOpenCodeBatchObjective } from "./analyzer.js";
 import { createBatchQueueZodArgs } from "./schemas-zod.js";
