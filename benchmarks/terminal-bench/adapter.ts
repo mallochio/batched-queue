@@ -1,3 +1,4 @@
+import { readFileSync, existsSync } from "node:fs";
 import type { AdapterCondition, TerminalBenchAdapter, TerminalBenchTask } from "./types.ts";
 
 const BASE_TOOLS = [
@@ -44,10 +45,34 @@ export function adaptersAreParityChecked(
 	return batch.tools.length === native.tools.length + 1 && batch.supportsBatchQueue;
 }
 
-/** Load tasks from a Terminal-Bench dataset JSONL or JSON array file. */
+/**
+ * Load tasks from a Terminal-Bench dataset JSONL file.
+ *
+ * Each line is a JSON object with at least an `id` field.
+ * Returns an empty array if the file doesn't exist (safe default
+ * for environments where the dataset hasn't been downloaded).
+ */
 export function loadTerminalBenchTasks(path: string): TerminalBenchTask[] {
-	// TODO: real loader for `dataset.jsonl` once the dataset is downloaded.
-	// The scaffold returns an empty list so no paid task is run by accident.
-	void path;
-	return [];
+	if (!existsSync(path)) {
+		return [];
+	}
+
+	const tasks: TerminalBenchTask[] = [];
+	const raw = readFileSync(path, "utf-8");
+	for (const line of raw.split("\n")) {
+		const trimmed = line.trim();
+		if (!trimmed) continue;
+		try {
+			const parsed = JSON.parse(trimmed);
+			tasks.push({
+				id: parsed.id,
+				name: parsed.name ?? parsed.id,
+				category: parsed.category,
+				prompt: parsed.prompt ?? "",
+			});
+		} catch {
+			// skip malformed lines
+		}
+	}
+	return tasks;
 }

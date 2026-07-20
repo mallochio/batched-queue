@@ -40,6 +40,7 @@
     "setup:local": "bun install && pi install -l \"$(pwd)\"",
     "test": "bun test && bun run tests/smoke-test.ts && bun run tests/headless-test.ts && bun run tests/opencode-smoke-test.ts && bun run tests/opencode-headless-test.ts && bun run tests/opencode-objective-test.ts && bun run tests/opencode-schemas.test.ts && bun run tests/opencode-apply-diff-test.ts",
     "bench:deterministic": "bun run benchmarks/deterministic/run.ts",
+    "bench:terminal-bench": "bun run benchmarks/terminal-bench/run.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

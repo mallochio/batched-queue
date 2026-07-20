@@ -2,12 +2,12 @@
 /**
  * Terminal-Bench Core v0.1.1 adapter scaffold.
  *
+ * Pinned dataset: terminal-bench-core v0.1.1 (dataset.jsonl).
+ * Budget gate is at zero until a non-zero budgetUsdPerSession is set.
+ *
  * Usage:
  *   bun run benchmarks/terminal-bench/run.ts --validate
  *   bun run benchmarks/terminal-bench/run.ts --dry-run
- *
- * The scaffold never executes paid tasks. It only validates adapter parity and
- * prints a manifest.
  */
 
 import {
@@ -19,8 +19,8 @@ import type { TerminalBenchManifest } from "./types.ts";
 
 const DATASET_PATH = "benchmarks/terminal-bench/dataset.jsonl";
 const TERMINAL_BENCH_VERSION = "0.1.1";
-const DATASET_VERSION = "unknown";
-const PI_VERSION = "pi";
+const DATASET_VERSION = "0.1.1";
+const PI_VERSION = process.env.PI_VERSION ?? "pi";
 
 function buildManifest(
 	taskIds: readonly string[],
@@ -72,7 +72,7 @@ if (args.includes("--dry-run") || args.length === 0) {
 	);
 	printManifest(manifest);
 	console.log(`\nDry-run: ${tasks.length} tasks loaded (none executed).`);
-	console.log("Set a non-zero budgetUsdPerSession and provide a dataset to execute.");
+	console.log("Budget gate: budgetUsdPerSession=0 (set a non-zero value to execute paid runs).");
 	process.exit(0);
 }
 

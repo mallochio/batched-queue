@@ -42,8 +42,16 @@ describe("Terminal-Bench adapter scaffold", () => {
 		expect(adaptersAreParityChecked(brokenNative, batch)).toBe(false);
 	});
 
-	it("loadTerminalBenchTasks returns an empty list by default", () => {
-		// The scaffold must not execute paid tasks when no dataset is present.
-		expect(loadTerminalBenchTasks("benchmarks/terminal-bench/dataset.jsonl")).toEqual([]);
+	it("loadTerminalBenchTasks loads the pinned Terminal-Bench dataset", () => {
+		const tasks = loadTerminalBenchTasks("benchmarks/terminal-bench/dataset.jsonl");
+		expect(tasks.length).toBe(80);
+		expect(tasks[0].id).toBe("hello-world");
+		expect(tasks.some((t) => t.category === "ml")).toBe(true);
+		// Budget gate: the loader returns tasks but does not execute them.
+		expect(tasks.every((t) => typeof t.id === "string")).toBe(true);
+	});
+
+	it("loadTerminalBenchTasks returns empty array for missing file", () => {
+		expect(loadTerminalBenchTasks("nonexistent.jsonl")).toEqual([]);
 	});
 });
