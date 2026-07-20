@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import type { Api, Message, Model, Tool, ToolCall } from "@earendil-works/pi-ai";
+import type { Api, Message, Model, Tool, ToolCall, Usage } from "@earendil-works/pi-ai";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import type { ActionBatchPayload } from "./payload.js";
@@ -17,6 +17,8 @@ import { executeReadLines } from "./executors/read-lines.js";
 import { executeGrepPattern } from "./executors/grep-pattern.js";
 import { DEFAULT_OUTPUT_LIMITS, DEFAULT_COMMAND_TIMEOUT_MS } from "./constants.js";
 import { findWorkspaceRoot } from "./lib/path-security.js";
+import type { PlannerUsage, PlannerUsageAccumulator } from "./planner-usage.js";
+import { addPlannerUsage, emptyPlannerUsage, finalizePlannerUsage } from "./planner-usage.js";
 
 /** @deprecated Pass ModelRegistry directly to analyzeBatchObjective. */
 export type BatchAnalyzerContext = ModelRegistry;
@@ -25,6 +27,7 @@ interface CompleteResponse {
 	readonly stopReason?: string;
 	readonly errorMessage?: string;
 	readonly content: ({ type: string } | ToolCall)[];
+	readonly usage?: Usage;
 }
 
 type CompleteImplementation = (
@@ -313,6 +316,11 @@ export function resolvePlanningModel(
  * Plans a batch from an objective using the session driver / planner model by default,
  * or the configured cheap execution model when set.
  */
+export interface PlannerBatchResult {
+	readonly payload: ActionBatchPayload;
+	readonly plannerUsage: PlannerUsage;
+}
+
 export async function analyzeBatchObjective(
 	objective: string,
 	driverModel: Model<Api>,
@@ -320,7 +328,7 @@ export async function analyzeBatchObjective(
 	config: ResolvedBatchQueueConfig,
 	cwd: string,
 	signal?: AbortSignal,
-): Promise<ActionBatchPayload> {
+): Promise<PlannerBatchResult> {
 	const planningRef = resolvePlanningModelRef(
 		{ provider: driverModel.provider, id: driverModel.id },
 		config,
@@ -335,15 +343,18 @@ export async function analyzeBatchObjective(
 	if (!auth.ok) {
 		throw new Error(auth.error);
 	}
+	const usageAccumulator = emptyPlannerUsage(planningRef.provider, planningRef.id);
 	const complete = await resolveCompleteImplementation();
-	return planBatchWithGrounding({
+	const payload = await planBatchWithGrounding({
 		objective,
 		config,
 		cwd,
 		complete: (context, options) => complete(planningModel, context, { apiKey: auth.apiKey, headers: auth.headers, ...options }),
 		runInspect: (name, args) => runInspectTool(name, args, cwd),
 		signal,
+		usageAccumulator,
 	});
+	return { payload, plannerUsage: finalizePlannerUsage(usageAccumulator) };
 }
 
 export interface PlanBatchDeps {
@@ -356,6 +367,8 @@ export interface PlanBatchDeps {
 	) => Promise<CompleteResponse>;
 	readonly runInspect: (name: string, args: Record<string, unknown>) => Promise<string>;
 	readonly signal?: AbortSignal;
+	/** Optional accumulator for planner model usage across grounding and final calls. */
+	readonly usageAccumulator?: PlannerUsageAccumulator;
 }
 
 /**
@@ -388,6 +401,10 @@ export async function planBatchWithGrounding(deps: PlanBatchDeps): Promise<Actio
 				...(config.executorThinking ? { reasoningEffort: config.executorThinking } : {}),
 			},
 		);
+
+		if (deps.usageAccumulator && response.usage) {
+			addPlannerUsage(deps.usageAccumulator, response.usage);
+		}
 
 		if (response.stopReason === "aborted") {
 			throw new Error("batch analysis aborted");

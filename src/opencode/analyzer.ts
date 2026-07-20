@@ -6,6 +6,8 @@ import { resolvePlanningModelRef } from "../planning-model.js";
 import { createSubmitActionBatchToolSchema } from "../schemas.js";
 import type { PluginInput } from "@opencode-ai/plugin";
 import { resolveOpenCodeSessionModelRef } from "./session-model.js";
+import type { PlannerUsage } from "../planner-usage.js";
+import { addPlannerUsage, emptyPlannerUsage, finalizePlannerUsage } from "../planner-usage.js";
 
 type OpenCodeClient = PluginInput["client"];
 type PromptResult = Awaited<ReturnType<OpenCodeClient["session"]["prompt"]>>;
@@ -14,6 +16,12 @@ interface StructuredPromptInfo {
 	readonly structured?: unknown;
 	readonly structured_output?: unknown;
 	readonly error?: { readonly name?: string; readonly message?: string };
+	readonly usage?: unknown;
+}
+
+export interface OpenCodeObjectiveResult {
+	readonly payload: ActionBatchPayload;
+	readonly plannerUsage?: PlannerUsage;
 }
 
 interface ExecutorPromptBody {
@@ -157,10 +165,11 @@ export async function analyzeOpenCodeBatchObjective(
 	objective: string,
 	config: ResolvedBatchQueueConfig,
 	_signal?: AbortSignal,
-): Promise<ActionBatchPayload> {
+): Promise<OpenCodeObjectiveResult> {
 	const driverModel = await resolveOpenCodeSessionModelRef(client, parentSessionID);
 	const planningModel = resolvePlanningModelRef(driverModel, config);
 	const planningSessionID = await createPlanningSession(client);
+	const usageAccumulator = emptyPlannerUsage(planningModel.provider, planningModel.id);
 
 	try {
 		const result = await promptPlanningModel(
@@ -177,6 +186,10 @@ export async function analyzeOpenCodeBatchObjective(
 			throw new Error(error.message ?? "planning model failed to produce structured batch plan");
 		}
 
+		if (info?.usage) {
+			addPlannerUsage(usageAccumulator, info.usage);
+		}
+
 		const structured = extractStructuredOutput(result);
 		if (!structured) {
 			throw new Error("planning model did not return structured batch plan");
@@ -184,7 +197,7 @@ export async function analyzeOpenCodeBatchObjective(
 
 		const payload = parseActionBatchPayload(structured, config.maxBatchActions);
 		assertObjectiveMutationPolicy(payload, config);
-		return payload;
+		return { payload, plannerUsage: finalizePlannerUsage(usageAccumulator) };
 	} finally {
 		await disposePlanningSession(client, planningSessionID);
 	}

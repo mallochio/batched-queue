@@ -24,6 +24,7 @@ import { loadFileConfig } from "./file-config";
 import { analyzeBatchObjective, createBatchQueueToolParameters } from "./analyzer";
 import type { PlanReflection } from "./payload";
 import type { BatchExecutionResult } from "./results";
+import type { PlannerUsage } from "./planner-usage";
 import {
 	createRunnerMap,
 	disposeAllRunners,
@@ -40,6 +41,7 @@ interface BatchQueueToolDetails {
 	readonly rationale?: string;
 	readonly reflection?: PlanReflection;
 	readonly result: BatchExecutionResult;
+	readonly plannerUsage?: PlannerUsage;
 }
 
 interface BatchQueueToolErrorDetails {
@@ -193,15 +195,17 @@ export function registerBatchedQueueExtension(
 				deps: {
 					getSessionId: () => ctx.sessionManager.getSessionId(),
 					getCwd: () => ctx.cwd,
-					resolveObjective: (objective) =>
-						analyzeBatchObjective(
+					resolveObjective: async (objective, sig) => {
+						const { payload, plannerUsage } = await analyzeBatchObjective(
 							objective,
 							driverModel,
 							ctx.modelRegistry,
 							resolvedConfig,
 							ctx.cwd,
-							signal,
-						),
+							sig,
+						);
+						return { payload, plannerUsage };
+					},
 				},
 			});
 
@@ -238,6 +242,7 @@ export function registerBatchedQueueExtension(
 					rationale: executeResult.rationale,
 					reflection: executeResult.reflection,
 					result: executeResult.result,
+					plannerUsage: executeResult.plannerUsage,
 				} satisfies BatchQueueToolDetails,
 				isError: executeResult.isError,
 			};

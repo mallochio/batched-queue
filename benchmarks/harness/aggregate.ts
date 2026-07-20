@@ -44,6 +44,8 @@ interface CellStats {
 	medianActions: number;
 	medianActionCompression: number;
 	medianCost: number;
+	medianPlannerCost: number;
+	medianTotalCost: number;
 	medianElapsedMs: number;
 	p95ElapsedMs: number;
 	medianInputTokens: number;
@@ -51,9 +53,16 @@ interface CellStats {
 	medianResultBytes: number;
 	meanBatchCalls: number;
 	haltedBatches: number;
+	costComplete: boolean;
+}
+
+function totalCostUsd(r: RunSummary): number {
+	return r.usage.costUsd + (r.plannerUsage?.costUsd ?? 0);
 }
 
 function computeCell(rows: RunSummary[]): CellStats {
+	const driverCost = median(rows.map((r) => r.usage.costUsd));
+	const plannerCost = median(rows.map((r) => r.plannerUsage?.costUsd ?? 0));
 	return {
 		scenario: rows[0].scenario,
 		condition: rows[0].condition,
@@ -63,17 +72,20 @@ function computeCell(rows: RunSummary[]): CellStats {
 		medianToolCalls: median(rows.map((r) => r.toolCalls)),
 		medianActions: median(rows.map((r) => r.actionsCompleted)),
 		medianActionCompression: median(rows.map((r) => r.actionCompression)),
-		medianCost: median(rows.map((r) => r.usage.costUsd)),
+		medianCost: driverCost,
+		medianPlannerCost: plannerCost,
+		medianTotalCost: driverCost + plannerCost,
 		medianElapsedMs: median(rows.map((r) => r.elapsedMs)),
 		p95ElapsedMs: percentile(
 			rows.map((r) => r.elapsedMs),
 			95,
 		),
-		medianInputTokens: median(rows.map((r) => r.usage.inputTokens)),
-		medianOutputTokens: median(rows.map((r) => r.usage.outputTokens)),
+		medianInputTokens: median(rows.map((r) => r.usage.inputTokens + (r.plannerUsage?.inputTokens ?? 0))),
+		medianOutputTokens: median(rows.map((r) => r.usage.outputTokens + (r.plannerUsage?.outputTokens ?? 0))),
 		medianResultBytes: median(rows.map((r) => r.resultBytes)),
 		meanBatchCalls: mean(rows.map((r) => r.batch.batchCalls)),
 		haltedBatches: rows.reduce((a, r) => a + r.batch.haltedBatches, 0),
+		costComplete: rows.every((r) => r.costComplete),
 	};
 }
 
@@ -152,10 +164,10 @@ function buildReport(
 		lines.push(`## Scenario ${label}`);
 		lines.push("");
 		lines.push(
-			"| condition | n | success | med turns | med tool calls | med actions | action compression | med cost (USD) | med result bytes | med latency (s) |",
+			"| condition | n | success | med turns | med tool calls | med actions | action compression | med cost (USD) | med planner cost (USD) | med total cost (USD) | med result bytes | med latency (s) |",
 		);
 		lines.push(
-			"| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+			"| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
 		);
 		const baseline = cellMap.get(`${scenario}|native`);
 		for (const condition of conditions) {
@@ -165,8 +177,8 @@ function buildReport(
 				`| ${condition} | ${c.n} | ${pct(c.successRate)} | ` +
 					`${fmt(c.medianTurns)} | ${fmt(c.medianToolCalls)} | ${fmt(c.medianActions)} | ` +
 					`${c.medianActionCompression.toFixed(2)}x | ` +
-					`$${c.medianCost.toFixed(5)} | ${fmt(c.medianResultBytes)} | ` +
-					`${(c.medianElapsedMs / 1000).toFixed(1)} |`,
+					`$${c.medianCost.toFixed(5)} | $${c.medianPlannerCost.toFixed(5)} | $${c.medianTotalCost.toFixed(5)} | ` +
+					`${fmt(c.medianResultBytes)} | ${(c.medianElapsedMs / 1000).toFixed(1)} |`,
 			);
 		}
 		lines.push("");
@@ -174,7 +186,7 @@ function buildReport(
 			lines.push("Reduction vs native (positive = fewer/cheaper):");
 			lines.push("");
 			lines.push(
-				"| condition | turns | tool calls | cost | result bytes |",
+				"| condition | turns | tool calls | total cost | result bytes |",
 			);
 			lines.push("| --- | --- | --- | --- | --- |");
 			for (const condition of conditions) {
@@ -184,7 +196,7 @@ function buildReport(
 				lines.push(
 					`| ${condition} | ${reduction(baseline.medianTurns, c.medianTurns)} | ` +
 						`${reduction(baseline.medianToolCalls, c.medianToolCalls)} | ` +
-						`${reduction(baseline.medianCost, c.medianCost)} | ` +
+						`${reduction(baseline.medianTotalCost, c.medianTotalCost)} | ` +
 						`${reduction(baseline.medianResultBytes, c.medianResultBytes)} |`,
 				);
 			}
@@ -196,17 +208,19 @@ function buildReport(
 	lines.push("## Aggregate across scenarios");
 	lines.push("");
 	lines.push(
-		"| condition | success | med turns | med tool calls | med cost (USD) | med result bytes |",
+		"| condition | success | med turns | med tool calls | driver cost (USD) | planner cost (USD) | total cost (USD) | med result bytes |",
 	);
-	lines.push("| --- | --- | --- | --- | --- | --- |");
+	lines.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
 	for (const condition of conditions) {
 		const condRows = rows.filter((r) => r.condition === condition);
 		if (condRows.length === 0) continue;
+		const driverCost = median(condRows.map((r) => r.usage.costUsd));
+		const plannerCost = median(condRows.map((r) => r.plannerUsage?.costUsd ?? 0));
 		lines.push(
 			`| ${condition} | ${pct(mean(condRows.map((r) => (r.verificationPassed ? 1 : 0))))} | ` +
 				`${fmt(median(condRows.map((r) => r.modelTurns)))} | ` +
 				`${fmt(median(condRows.map((r) => r.toolCalls)))} | ` +
-				`$${median(condRows.map((r) => r.usage.costUsd)).toFixed(5)} | ` +
+				`$${driverCost.toFixed(5)} | $${plannerCost.toFixed(5)} | $${(driverCost + plannerCost).toFixed(5)} | ` +
 				`${fmt(median(condRows.map((r) => r.resultBytes)))} |`,
 		);
 	}

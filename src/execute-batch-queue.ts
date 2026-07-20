@@ -5,6 +5,7 @@ import type { ActionBatchPayload, PlanReflection } from "./payload.js";
 import type { BatchExecutionResult } from "./results.js";
 import { formatBatchResult } from "./format-batch-result.js";
 import { BatchQueueRunner } from "./queue-runner.js";
+import type { PlannerUsage } from "./planner-usage.js";
 
 export interface BatchQueueToolParams {
 	readonly objective?: string;
@@ -12,11 +13,16 @@ export interface BatchQueueToolParams {
 	readonly batchId?: string;
 }
 
+export interface ObjectiveResolutionResult {
+	readonly payload: ActionBatchPayload;
+	readonly plannerUsage?: PlannerUsage;
+}
+
 export interface BatchQueueExecuteDeps {
 	readonly resolveObjective?: (
 		objective: string,
 		signal?: AbortSignal,
-	) => Promise<ActionBatchPayload>;
+	) => Promise<ObjectiveResolutionResult>;
 	readonly getSessionId: () => string;
 	readonly getCwd: () => string;
 }
@@ -27,6 +33,7 @@ export interface BatchQueueExecuteResult {
 	readonly rationale?: string;
 	readonly reflection?: PlanReflection;
 	readonly result?: BatchExecutionResult;
+	readonly plannerUsage?: PlannerUsage;
 	readonly error?: string;
 }
 
@@ -71,6 +78,7 @@ export async function executeBatchQueue(options: {
 }): Promise<BatchQueueExecuteResult> {
 	const { config, params, deps, runners, signal } = options;
 	let payload: ActionBatchPayload;
+	let plannerUsage: PlannerUsage | undefined;
 
 	try {
 		if (params.objective?.trim() && params.actions && params.actions.length > 0) {
@@ -93,7 +101,9 @@ export async function executeBatchQueue(options: {
 					error: "missing objective resolver",
 				};
 			}
-			payload = await deps.resolveObjective(params.objective.trim(), signal);
+			const resolved = await deps.resolveObjective(params.objective.trim(), signal);
+			payload = resolved.payload;
+			plannerUsage = resolved.plannerUsage;
 			if (params.batchId) {
 				payload = { ...payload, batchId: params.batchId };
 			}
@@ -128,5 +138,6 @@ export async function executeBatchQueue(options: {
 		rationale: payload.rationale,
 		reflection: payload.reflection,
 		result,
+		plannerUsage,
 	};
 }

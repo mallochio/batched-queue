@@ -12,6 +12,24 @@ Every episode reports these buckets independently:
 Do not infer planner usage from top-level Pi turns. Objective planner calls are
 nested inside the `batch_queue` tool execution.
 
+## Instrumentation
+
+- `src/planner-usage.ts` defines a normalized `PlannerUsage` shape and an
+  accumulator that sums across multiple planner calls.
+- `src/analyzer.ts` (`analyzeBatchObjective` / `planBatchWithGrounding`) forwards
+  the underlying Pi `complete()` `usage` into the accumulator and returns
+  `{ payload, plannerUsage }`.
+- `src/execute-batch-queue.ts` passes the planner usage through the execute
+  result.
+- `src/extension.ts` includes `plannerUsage` in the `batch_queue` tool result
+  `details`.
+- `src/opencode/analyzer.ts` captures `data.info.usage` when OpenCode exposes it.
+- `benchmarks/harness/parse-events.ts` extracts `details.plannerUsage` from each
+  `batch_queue` `tool_execution_end` event and aggregates across replans.
+- `benchmarks/harness/aggregate.ts` reports driver, planner, and total cost
+  columns, and only marks cost complete when every bucket reports a non-zero
+  cost or has zero tokens.
+
 ## Required fields
 
 Usage records should preserve raw provider data and normalize:
@@ -29,9 +47,8 @@ type ModelUsage = {
 };
 ```
 
-Planner details should include the model reference, whether it reused the
-driver, call count, per-call usage, aggregate usage, and `costComplete`.
-Aggregate reports must key subtotals by `(provider, model)`.
+Planner details include the model reference, call count, aggregate usage, and
+`costComplete`. Aggregate reports key subtotals by `(provider, model)`.
 
 ## Missing cost
 
@@ -41,12 +58,18 @@ inventing a price. Explicit-action conditions have no planner bucket.
 
 ## Validation
 
-Use synthetic usage fixtures to test:
+Synthetic usage fixtures test:
 
-- multiple grounding and planner calls;
-- missing cost on one call;
-- driver and planner on different providers;
+- multiple `batch_queue` planner calls;
+- missing cost when tokens are present;
 - explicit batches with zero planner calls;
-- total-cost aggregation and per-provider subtotals.
+- `costComplete` propagation into `RunSummary`.
+
+Run:
+
+```bash
+bun test benchmarks/harness/cost-accounting.test.ts
+bun test tests/planner-usage.test.ts
+```
 
 Do not run paid provider validation as part of unit tests.

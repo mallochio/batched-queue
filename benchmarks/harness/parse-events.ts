@@ -14,11 +14,75 @@ import type {
 	OracleResult,
 	Outcome,
 	ParsedEvents,
+	PlannerUsageSummary,
 	RunSummary,
 	UsageTotals,
 } from "./types.ts";
 
 const BATCH_COUNT_RE = /\((\d+)\/(\d+) actions/;
+
+function asNumber(value: unknown): number {
+	if (typeof value === "number") return value;
+	if (typeof value === "string") {
+		const parsed = Number(value);
+		return Number.isFinite(parsed) ? parsed : 0;
+	}
+	return 0;
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function plannerUsageFromDetails(details: unknown): PlannerUsageSummary | undefined {
+	if (!isObject(details)) return undefined;
+	const raw = details.plannerUsage;
+	if (!isObject(raw)) return undefined;
+	const inputTokens = asNumber(raw.inputTokens ?? raw.input);
+	const outputTokens = asNumber(raw.outputTokens ?? raw.output);
+	const cacheReadTokens = asNumber(raw.cacheReadTokens ?? raw.cacheRead);
+	const cacheWriteTokens = asNumber(raw.cacheWriteTokens ?? raw.cacheWrite);
+	const reasoningTokens = asNumber(raw.reasoningTokens ?? raw.reasoning);
+	const totalTokens = asNumber(raw.totalTokens ?? raw.totalTokens);
+	const costUsd = asNumber(raw.costUsd ?? (isObject(raw.cost) ? raw.cost.total : undefined));
+	const calls = asNumber(raw.calls);
+	if (calls === 0 && totalTokens === 0) return undefined;
+	const provider = String(raw.provider ?? "unknown");
+	const model = String(raw.model ?? "unknown");
+	const costComplete = costUsd > 0 || totalTokens === 0;
+	return {
+		provider,
+		model,
+		calls,
+		inputTokens,
+		outputTokens,
+		cacheReadTokens,
+		cacheWriteTokens,
+		reasoningTokens,
+		totalTokens,
+		costUsd,
+		costComplete,
+	};
+}
+
+function addPlannerSummary(
+	acc: PlannerUsageSummary,
+	next: PlannerUsageSummary,
+): PlannerUsageSummary {
+	return {
+		provider: acc.provider,
+		model: acc.model,
+		calls: acc.calls + next.calls,
+		inputTokens: acc.inputTokens + next.inputTokens,
+		outputTokens: acc.outputTokens + next.outputTokens,
+		cacheReadTokens: acc.cacheReadTokens + next.cacheReadTokens,
+		cacheWriteTokens: acc.cacheWriteTokens + next.cacheWriteTokens,
+		reasoningTokens: acc.reasoningTokens + next.reasoningTokens,
+		totalTokens: acc.totalTokens + next.totalTokens,
+		costUsd: acc.costUsd + next.costUsd,
+		costComplete: acc.costComplete && next.costComplete,
+	};
+}
 
 interface RawUsage {
 	input?: number;
@@ -91,6 +155,7 @@ export function parseEventStream(jsonl: string): ParsedEvents {
 	let willRetry = false;
 	let finalAssistantText = "";
 	const bashOutputs: string[] = [];
+	let plannerUsage: PlannerUsageSummary | undefined;
 	let haltReason: string | null = null;
 	let parseErrors = 0;
 
@@ -139,6 +204,11 @@ export function parseEventStream(jsonl: string): ParsedEvents {
 						const halt = resultText.match(/halted at action \d+ \(([^)]*)\)/);
 						if (halt) haltReason = halt[1];
 					}
+					const details = (obj.result as { details?: unknown })?.details;
+					const usage = plannerUsageFromDetails(details);
+					if (usage) {
+						plannerUsage = plannerUsage ? addPlannerSummary(plannerUsage, usage) : usage;
+					}
 				}
 				break;
 			}
@@ -180,6 +250,7 @@ export function parseEventStream(jsonl: string): ParsedEvents {
 		willRetry,
 		finalAssistantText,
 		bashOutputs,
+		plannerUsage,
 		haltReason,
 		parseErrors,
 	};
@@ -223,6 +294,19 @@ function classifyOutcome(
 	if (!parsed.reachedAgentEnd) return "provider_error";
 	if (parsed.willRetry) return "invalid";
 	return verificationPassed ? "pass" : "fail";
+}
+
+function isCostComplete(usage: UsageTotals): boolean {
+	return usage.costUsd > 0 || usage.totalTokens === 0;
+}
+
+function deriveCostComplete(
+	driver: UsageTotals,
+	planner?: PlannerUsageSummary,
+): boolean {
+	const driverComplete = isCostComplete(driver);
+	const plannerComplete = !planner || planner.costComplete;
+	return driverComplete && plannerComplete;
 }
 
 export async function summarizeRun(input: SummarizeInput): Promise<RunSummary> {
@@ -274,6 +358,8 @@ export async function summarizeRun(input: SummarizeInput): Promise<RunSummary> {
 		actionsCompleted,
 		actionCompression,
 		usage: parsed.usage,
+		plannerUsage: parsed.plannerUsage,
+		costComplete: deriveCostComplete(parsed.usage, parsed.plannerUsage),
 		resultBytes: parsed.resultBytes,
 		verificationPassed,
 		batch: parsed.batch,

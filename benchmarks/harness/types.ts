@@ -14,6 +14,17 @@ export interface UsageTotals {
 	costUsd: number;
 }
 
+export interface PlannerUsageSummary extends UsageTotals {
+	/** Provider id, e.g. "openai". */
+	provider: string;
+	/** Model id used by the planner. */
+	model: string;
+	/** Number of planner model calls aggregated. */
+	calls: number;
+	/** Whether the reported cost is complete for this planner. */
+	costComplete: boolean;
+}
+
 export interface BatchActionStats {
 	/** Number of batch_queue tool calls. */
 	batchCalls: number;
@@ -38,6 +49,8 @@ export interface ParsedEvents {
 	finalAssistantText: string;
 	/** Raw output text from execute_bash and batch_queue tool results. */
 	bashOutputs: string[];
+	/** Aggregated nested planner usage from batch_queue tool details. */
+	plannerUsage?: PlannerUsageSummary;
 	haltReason: string | null;
 	parseErrors: number;
 }
@@ -129,6 +142,10 @@ export interface RunSummary {
 	/** actionsCompleted / max(toolCalls, 1). */
 	actionCompression: number;
 	usage: UsageTotals;
+	/** Aggregated nested planner usage from batch_queue tool details. */
+	plannerUsage?: PlannerUsageSummary;
+	/** True when both driver and planner cost figures are complete. */
+	costComplete: boolean;
 	/** Bytes of tool result payload returned to the model. */
 	resultBytes: number;
 	/** Whether the completion predicate or oracle passed. */

@@ -7,12 +7,14 @@ const deps = {
 	getSessionId: () => "execute-test",
 	getCwd: () => process.cwd(),
 	resolveObjective: async () => ({
-		actions: [{ type: "read_lines" as const, path: "package.json", startLine: 1, endLine: 1 }],
-		rationale: "read package metadata",
-		reflection: {
-			confidence: 5,
-			successCriteria: "package metadata is returned",
-			risks: [],
+		payload: {
+			actions: [{ type: "read_lines" as const, path: "package.json", startLine: 1, endLine: 1 }],
+			rationale: "read package metadata",
+			reflection: {
+				confidence: 5,
+				successCriteria: "package metadata is returned",
+				risks: [],
+			},
 		},
 	}),
 };
