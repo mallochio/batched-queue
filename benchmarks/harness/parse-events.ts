@@ -4,9 +4,16 @@
 // Only known numeric usage fields are normalized; the raw stream is never
 // assumed to follow one exact schema.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { defaultOracle, reverify } from "./oracles.ts";
 import type {
 	BatchActionStats,
 	ConditionId,
+	OracleContext,
+	OracleResult,
+	Outcome,
+	ParsedEvents,
 	RunSummary,
 	UsageTotals,
 } from "./types.ts";
@@ -67,21 +74,6 @@ function byteLength(text: string): number {
 	return Buffer.byteLength(text, "utf8");
 }
 
-export interface ParsedEvents {
-	modelTurns: number;
-	toolCalls: number;
-	toolBreakdown: Record<string, number>;
-	usage: UsageTotals;
-	resultBytes: number;
-	batch: BatchActionStats;
-	reachedAgentEnd: boolean;
-	willRetry: boolean;
-	/** Concatenated text of all final-transcript assistant messages. */
-	finalAssistantText: string;
-	haltReason: string | null;
-	parseErrors: number;
-}
-
 export function parseEventStream(jsonl: string): ParsedEvents {
 	const usage = emptyUsage();
 	const toolBreakdown: Record<string, number> = {};
@@ -98,6 +90,7 @@ export function parseEventStream(jsonl: string): ParsedEvents {
 	let reachedAgentEnd = false;
 	let willRetry = false;
 	let finalAssistantText = "";
+	const bashOutputs: string[] = [];
 	let haltReason: string | null = null;
 	let parseErrors = 0;
 
@@ -128,6 +121,9 @@ export function parseEventStream(jsonl: string): ParsedEvents {
 				const name = String(obj.toolName ?? "unknown");
 				const resultText = textOf(obj.result);
 				resultBytes += byteLength(resultText);
+				if (name === "execute_bash" || name === "batch_queue") {
+					bashOutputs.push(resultText);
+				}
 				if (name === "batch_queue") {
 					batch.batchCalls++;
 					const m = resultText.match(BATCH_COUNT_RE);
@@ -183,6 +179,7 @@ export function parseEventStream(jsonl: string): ParsedEvents {
 		reachedAgentEnd,
 		willRetry,
 		finalAssistantText,
+		bashOutputs,
 		haltReason,
 		parseErrors,
 	};
@@ -197,10 +194,38 @@ export interface SummarizeInput {
 	timedOut: boolean;
 	elapsedMs: number;
 	jsonl: string;
-	predicate: (finalText: string) => boolean;
+	/**
+	 * Deprecated transcript predicate. Used only when no oracle/fixtureDir is
+	 * supplied.
+	 */
+	predicate?: (finalText: string) => boolean;
+	/** Fixture directory containing .bench/proof/ artifacts. */
+	fixtureDir?: string;
+	/** Fixture-owned oracle; takes precedence over predicate. */
+	oracle?: (ctx: OracleContext) => Promise<OracleResult> | OracleResult;
 }
 
-export function summarizeRun(input: SummarizeInput): RunSummary {
+function readFixtureFile(fixtureDir: string | undefined, path: string): string | null {
+	if (!fixtureDir) return null;
+	try {
+		return readFileSync(join(fixtureDir, path), "utf8");
+	} catch {
+		return null;
+	}
+}
+
+function classifyOutcome(
+	parsed: ParsedEvents,
+	timedOut: boolean,
+	verificationPassed: boolean,
+): Outcome {
+	if (timedOut) return "timeout";
+	if (!parsed.reachedAgentEnd) return "provider_error";
+	if (parsed.willRetry) return "invalid";
+	return verificationPassed ? "pass" : "fail";
+}
+
+export async function summarizeRun(input: SummarizeInput): Promise<RunSummary> {
 	const parsed = parseEventStream(input.jsonl);
 	const actionsCompleted =
 		parsed.batch.batchCalls > 0
@@ -209,6 +234,31 @@ export function summarizeRun(input: SummarizeInput): RunSummary {
 				(parsed.toolCalls - parsed.batch.batchCalls)
 			: parsed.toolCalls;
 	const actionCompression = actionsCompleted / Math.max(parsed.toolCalls, 1);
+
+	let verificationPassed = false;
+	let oracleResult: OracleResult | undefined;
+
+	if (input.oracle && input.fixtureDir) {
+		const expectedRaw = readFixtureFile(input.fixtureDir, ".bench/proof/expected.json");
+		const expected = expectedRaw
+			? (JSON.parse(expectedRaw) as { scenario: string; family: string; proof: Record<string, unknown> })
+			: { scenario: input.scenario, family: "unknown", proof: {} };
+		const ctx: OracleContext = {
+			fixtureDir: input.fixtureDir,
+			expected,
+			parsed,
+			timedOut: input.timedOut,
+			readFixtureFile: (path) => readFixtureFile(input.fixtureDir, path),
+			reverify: (command, timeoutMs = 30000) => reverify(input.fixtureDir!, command, timeoutMs),
+		};
+		oracleResult = await input.oracle(ctx);
+		verificationPassed = oracleResult.passed;
+	} else if (input.predicate) {
+		verificationPassed =
+			parsed.reachedAgentEnd &&
+			!parsed.willRetry &&
+			input.predicate(parsed.finalAssistantText);
+	}
 
 	return {
 		scenario: input.scenario,
@@ -225,12 +275,11 @@ export function summarizeRun(input: SummarizeInput): RunSummary {
 		actionCompression,
 		usage: parsed.usage,
 		resultBytes: parsed.resultBytes,
-		verificationPassed:
-			parsed.reachedAgentEnd &&
-			!parsed.willRetry &&
-			input.predicate(parsed.finalAssistantText),
+		verificationPassed,
 		batch: parsed.batch,
 		completed: parsed.reachedAgentEnd && !parsed.willRetry,
+		outcome: classifyOutcome(parsed, input.timedOut, verificationPassed),
+		oracle: oracleResult,
 		haltReason: parsed.haltReason,
 	};
 }

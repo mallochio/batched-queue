@@ -128,8 +128,8 @@ test("tolerates malformed lines", () => {
 	expect(p.toolCalls).toBe(2);
 });
 
-test("summarizeRun computes action compression", () => {
-	const nativeSummary = summarizeRun({
+test("summarizeRun computes action compression", async () => {
+	const nativeSummary = await summarizeRun({
 		scenario: "H1",
 		condition: "native",
 		run: 1,
@@ -143,8 +143,9 @@ test("summarizeRun computes action compression", () => {
 	expect(nativeSummary.actionsCompleted).toBe(2);
 	expect(nativeSummary.actionCompression).toBe(1);
 	expect(nativeSummary.verificationPassed).toBe(true);
+	expect(nativeSummary.outcome).toBe("pass");
 
-	const batchSummary = summarizeRun({
+	const batchSummary = await summarizeRun({
 		scenario: "H1",
 		condition: "batch-explicit",
 		run: 1,
@@ -158,4 +159,5 @@ test("summarizeRun computes action compression", () => {
 	expect(batchSummary.actionsCompleted).toBe(3);
 	expect(batchSummary.actionCompression).toBe(3);
 	expect(batchSummary.verificationPassed).toBe(true);
+	expect(batchSummary.outcome).toBe("pass");
 });

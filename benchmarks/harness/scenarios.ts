@@ -4,6 +4,7 @@
 // tool-selection instruction, per the benchmark reporting rules.
 
 import { MARKERS } from "./fixture.ts";
+import { defaultOracle } from "./oracles.ts";
 import type { ConditionSpec, ScenarioSpec } from "./types.ts";
 
 const norm = (s: string) => s.toLowerCase().replace(/[\s`*_]+/g, "");
@@ -264,6 +265,10 @@ export const SCENARIOS: ScenarioSpec[] = [
 		predicate: (t) => contains(t, "version") && contains(t, "loadConfig"),
 	},
 ];
+
+for (const scenario of SCENARIOS) {
+	scenario.oracle = defaultOracle;
+}
 
 export const CONDITIONS: ConditionSpec[] = [
 	{

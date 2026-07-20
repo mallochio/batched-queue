@@ -210,7 +210,7 @@ async function main(): Promise<void> {
 			continue;
 		}
 
-		const fixture = createFixture();
+		const fixture = createFixture(scenario.id);
 		const prompt = `${scenario.task}\n\n${condition.toolInstruction}`;
 		const piArgs = [
 			"--mode",
@@ -251,7 +251,7 @@ async function main(): Promise<void> {
 			writeFileSync(join(args.outDir, `${tag}.stderr.log`), result.stderr);
 		}
 
-		const summary = summarizeRun({
+		const summary = await summarizeRun({
 			scenario: scenario.id,
 			condition: condition.id,
 			run: job.run,
@@ -260,7 +260,8 @@ async function main(): Promise<void> {
 			timedOut: result.timedOut,
 			elapsedMs: result.elapsedMs,
 			jsonl: result.stdout,
-			predicate: scenario.predicate,
+			fixtureDir: fixture.dir,
+			oracle: scenario.oracle,
 		});
 		writeFileSync(
 			join(args.outDir, `${tag}.summary.json`),

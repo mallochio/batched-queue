@@ -2,36 +2,7 @@
 
 export type ConditionId = "native" | "batch-explicit" | "batch-objective";
 
-export interface ScenarioSpec {
-	/** Stable scenario id, e.g. "H1". */
-	id: string;
-	/** Short human label. */
-	label: string;
-	/**
-	 * Task instruction shared across every condition. The condition-specific
-	 * tool instruction is appended by the runner so prompts stay identical
-	 * except for the required tool selection.
-	 */
-	task: string;
-	/**
-	 * Deterministic completion predicate. Receives the final assistant text
-	 * (concatenated) and returns whether the task was correctly completed.
-	 */
-	predicate: (finalText: string) => boolean;
-	/** Whether this scenario expects the batch to fast-fail (H4-style). */
-	expectsHalt?: boolean;
-}
-
-export interface ConditionSpec {
-	id: ConditionId;
-	label: string;
-	/** Extra Pi CLI args unique to this condition. */
-	piArgs: string[];
-	/** Tool-selection instruction appended to every scenario task. */
-	toolInstruction: string;
-	/** Extra environment variables set only for this condition. */
-	env?: Record<string, string>;
-}
+export type Outcome = "pass" | "fail" | "timeout" | "provider_error" | "invalid";
 
 export interface UsageTotals {
 	inputTokens: number;
@@ -52,6 +23,85 @@ export interface BatchActionStats {
 	requestedActions: number;
 	/** Number of batch_queue calls that halted (fast-fail). */
 	haltedBatches: number;
+}
+
+export interface ParsedEvents {
+	modelTurns: number;
+	toolCalls: number;
+	toolBreakdown: Record<string, number>;
+	usage: UsageTotals;
+	resultBytes: number;
+	batch: BatchActionStats;
+	reachedAgentEnd: boolean;
+	willRetry: boolean;
+	/** Concatenated text of all final-transcript assistant messages. */
+	finalAssistantText: string;
+	/** Raw output text from execute_bash and batch_queue tool results. */
+	bashOutputs: string[];
+	haltReason: string | null;
+	parseErrors: number;
+}
+
+export interface FixtureExpectations {
+	scenario: string;
+	family: string;
+	proof: Record<string, unknown>;
+}
+
+export interface OracleContext {
+	fixtureDir: string;
+	expected: FixtureExpectations;
+	parsed: ParsedEvents;
+	timedOut: boolean;
+	readFixtureFile(path: string): string | null;
+	reverify(command: string, timeoutMs?: number): Promise<{
+		exitCode: number;
+		stdout: string;
+		stderr: string;
+	}>;
+}
+
+export interface OracleResult {
+	passed: boolean;
+	checks: Record<string, boolean>;
+	note?: string;
+}
+
+export interface ScenarioSpec {
+	/** Stable scenario id, e.g. "H1". */
+	id: string;
+	/** Short human label. */
+	label: string;
+	/**
+	 * Task instruction shared across every condition. The condition-specific
+	 * tool instruction is appended by the runner so prompts stay identical
+	 * except for the required tool selection.
+	 */
+	task: string;
+	/**
+	 * Deterministic completion predicate. Receives the final assistant text
+	 * (concatenated) and returns whether the task was correctly completed.
+	 * Kept for compatibility; fixture-owned oracles take precedence.
+	 */
+	predicate: (finalText: string) => boolean;
+	/**
+	 * Fixture-owned oracle that inspects proof artifacts and re-runs
+	 * verification commands. Takes precedence over predicate when supplied.
+	 */
+	oracle?: (ctx: OracleContext) => Promise<OracleResult> | OracleResult;
+	/** Whether this scenario expects the batch to fast-fail (H4-style). */
+	expectsHalt?: boolean;
+}
+
+export interface ConditionSpec {
+	id: ConditionId;
+	label: string;
+	/** Extra Pi CLI args unique to this condition. */
+	piArgs: string[];
+	/** Tool-selection instruction appended to every scenario task. */
+	toolInstruction: string;
+	/** Extra environment variables set only for this condition. */
+	env?: Record<string, string>;
 }
 
 export interface RunSummary {
@@ -81,11 +131,15 @@ export interface RunSummary {
 	usage: UsageTotals;
 	/** Bytes of tool result payload returned to the model. */
 	resultBytes: number;
-	/** Whether the completion predicate passed. */
+	/** Whether the completion predicate or oracle passed. */
 	verificationPassed: boolean;
 	batch: BatchActionStats;
 	/** Did the run terminate at agent_end without a retry? */
 	completed: boolean;
+	/** One of the outcome taxonomy values. */
+	outcome: Outcome;
+	/** Oracle result when an oracle was run. */
+	oracle?: OracleResult;
 	/** Reason a batch halted, if any. */
 	haltReason: string | null;
 }
