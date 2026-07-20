@@ -3,3 +3,4 @@ package-lock.json
 .opencode/batched-queue.json
 tests/.tmp/
 benchmarks/results/
+.cache
