@@ -4,6 +4,11 @@ This harness measures the current `batched-queue` implementation in Pi JSON
 event mode. It compares native sequential tools, explicit `batch_queue`
 actions, and objective-planned batches on deterministic temporary fixtures.
 
+The coordination contract is in [`../WORK-UNITS.md`](../WORK-UNITS.md).
+Validator and cost requirements are maintained in
+[`VALIDATOR-RUNBOOK.md`](./VALIDATOR-RUNBOOK.md) and
+[`COST-RUNBOOK.md`](./COST-RUNBOOK.md).
+
 ## Prerequisites
 
 - Run `bun install` from the repository root.

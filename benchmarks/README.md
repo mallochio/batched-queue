@@ -16,6 +16,14 @@ This is intentionally narrower than a claim that `batch_queue` is faster for eve
 - [`harness/README.md`](./harness/README.md) — current executable commands,
   validated Azure configuration, and pre-external-benchmark checklist.
 - [`RESULTS-TEMPLATE.md`](./RESULTS-TEMPLATE.md) — report template; do not fill it with unverified or cherry-picked results.
+- [`WORK-UNITS.md`](./WORK-UNITS.md) — atomic delegation order, ownership
+  contract, dependencies, and budget gates.
+- [`harness/VALIDATOR-RUNBOOK.md`](./harness/VALIDATOR-RUNBOOK.md) —
+  fixture-owned oracle contract and outcome taxonomy.
+- [`harness/COST-RUNBOOK.md`](./harness/COST-RUNBOOK.md) — driver/planner/
+  execution cost accounting and missing-cost rules.
+- [`terminal-bench/RUNBOOK.md`](./terminal-bench/RUNBOOK.md) — external
+  Terminal-Bench adapter stages and paid-run gate.
 
 ## Conditions to compare
 
