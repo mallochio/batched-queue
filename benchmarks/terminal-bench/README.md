@@ -45,6 +45,63 @@ episode count, not provider USD; Pi exposes no enforceable per-session dollar
 cap. Inspect Harbor's result and provider billing before authorizing the six
 pilot episodes.
 
-Harbor writes the smoke job under `benchmarks/results/terminal-bench/`. Raw Pi
-JSON events are retained as the agent log, and the official verifier reward is
-the source of truth for pass/fail.
+Harbor writes the smoke job under `benchmarks/results/terminal-bench/`. Pi
+turn, tool, usage, and final-message events are retained; redundant streaming
+`message_update` events are dropped. The official verifier reward is the source
+of truth for pass/fail.
+
+## Paired pilot
+
+After the smoke gate passes, run the six seeded, sequential episodes:
+
+```bash
+BQ_ALLOW_PAID_PILOT=1 \
+BQ_MAX_PILOT_COST_USD=2.00 \
+BQ_MODEL=azure-openai-responses/gpt-5.6-luna \
+bash benchmarks/terminal-bench/run.sh pilot
+```
+
+Seed 42 fixes condition order as:
+
+```text
+fix-git                    batch  native
+modernize-scientific-stack batch  native
+nginx-request-logging       native batch
+```
+
+The runner checks all three Docker image digests before spending, stops before
+the next episode once the observed cost reaches the cap, and writes a JSON
+summary beside the Harbor jobs. Re-summarize any job directory with:
+
+```bash
+bash benchmarks/terminal-bench/run.sh summarize <job-directory>
+```
+
+The completed pilot is summarized in [`PILOT_REPORT.md`](./PILOT_REPORT.md).
+
+## Full paired run
+
+The full runner freezes all 89 task IDs and seed-42 condition order in the run
+directory, runs fresh Harbor containers sequentially, skips completed jobs when
+resumed with the same directory, and stops before the next episode when observed
+cost reaches the configured cap:
+
+```bash
+BQ_ALLOW_PAID_FULL=1 \
+BQ_MAX_FULL_COST_USD=30.00 \
+BQ_MODEL=azure-openai-responses/gpt-5.6-luna \
+BQ_RUN_DIR=benchmarks/results/terminal-bench/full-frozen \
+bash benchmarks/terminal-bench/run.sh full
+```
+
+Keep `BQ_RUN_DIR` unchanged to resume an interrupted run. The paired pilot cost
+$0.569548; its linear full-suite projection is about $16.90, but the $30 stop
+loss allows for harder tasks without silently spending past the gate.
+
+After completion, compute task-level paired bootstrap intervals and the exact
+McNemar test from the generated summary:
+
+```bash
+.venv_harbor/bin/python benchmarks/terminal-bench/analyze.py \
+  "$BQ_RUN_DIR/summary.json"
+```

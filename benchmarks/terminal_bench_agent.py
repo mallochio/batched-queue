@@ -164,7 +164,8 @@ class BatchedQueuePi(Pi):
             "pi --print --mode json "
             f"--provider {shlex.quote(provider)} --model {shlex.quote(model)} "
             f"{self.build_cli_flags()} {shlex.quote(instruction)} "
-            f"2>&1 </dev/null | stdbuf -oL tee /logs/agent/{self._OUTPUT_FILENAME}"
+            "2>&1 </dev/null | grep -v '\"type\":\"message_update\"' | "
+            f"stdbuf -oL tee /logs/agent/{self._OUTPUT_FILENAME}"
         )
         await self.exec_as_agent(environment, command=command, env=self._provider_env(provider))
 
