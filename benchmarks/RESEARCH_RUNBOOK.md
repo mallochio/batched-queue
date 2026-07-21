@@ -22,55 +22,114 @@ Across all our experiments, we benchmark the following conditions against each o
 
 ### Phase 1: Local Deterministic Pilot
 *   **Scale:** 36 runs across 4 scenarios.
-*   **Results:** 100% success rate across all conditions. Demonstrated a 33% reduction in interaction turns (3 → 2 median), 50% reduction in tool calls (2 → 1), and ~47% faster execution wall time.
+*   **Result:** All conditions completed the small synthetic suite. Batching reduced orchestration boundaries, but these environment-specific timings are mechanism evidence only.
 
 ### Phase 2: Cloud Scale-Up (July 20–21, 2026)
-*   **Scale:** 1,440 runs across 24 complex, multi-step repository workflows (H1–H24).
-*   **Model:** Azure OpenAI `gpt-5.6-luna` (Thinking: high).
-*   **Infrastructure:** Asynchronous GCP `n4-standard-8` instance via SkyPilot ($30 budget).
-*   **Findings:**
-    *   **Success Rate Boost:** Native sequential agents solved tasks 70% of the time. The `batch-explicit` tool boosted success to **88%**, while `batch-objective` hit **86%**.
-    *   **Turn Compression:** Both batching strategies halved the median interaction loops (2 → 1 tool calls).
-    *   **Failure Boundary Handling:** In complex stateful mutation scenarios (e.g., H22), native agents failed over half the time (45% success). The `batch-explicit` agent queued its actions and achieved **100% success**, proving batching prevents agents from losing overarching context.
-    *   **Cost Trade-off:** `batch-explicit` costs ~25% more per task ($0.014 vs $0.011) due to structured evidence payloads. `batch-objective` costs ~120% more ($0.024) due to the secondary planner LLM.
+*   **Scale:** 1,440 episodes: 24 synthetic scenarios × 3 conditions × 20 repetitions.
+*   **Model:** Azure OpenAI `gpt-5.6-luna` (thinking: high).
+*   **Infrastructure:** GCP `n4-standard-8` via SkyPilot ($30 budget).
+*   **Directional observations:** Native, batch-explicit, and batch-objective recorded 70%, 88%, and 86% verification rates respectively. Median model turns were 3, 2, and 2; median tool calls were 2, 1, and 1. Batch-explicit had modest aggregate latency improvement, while batch-objective was slower and more expensive.
+*   **Scope:** Batch-explicit improved verification on 6 of 24 scenarios, tied on 17, and regressed on 1. The suite contains correlated variants over one fixture, so episodes are not independent task samples.
+
+### Known validity issues
+The archived Phase 2 report is retained for provenance, not as publication-ready evidence:
+
+1. H8 and H10 reverify from `nested/` using the invalid relative path `scripts/check.sh`; all conditions scored zero.
+2. H21's oracle requires both `fail` and `nonzero`, although its task predicate accepts either, favoring structured batch error wording.
+3. Agent-visible `.bench/proof/` files are not hidden oracles.
+4. Post-run reverification proves fixture validity, not that the agent performed every requested action.
+5. Aggregate success currently uses `verificationPassed`; a timeout can therefore be counted as successful even when its outcome is `timeout`.
+6. Several scenarios directly request persistent state or result binding unavailable as equivalent native primitives. These are mechanism tests, not general capability tests.
+7. H22 is read-only; its result does not prove that batching prevents context loss or improves mutation safety.
+
+Do not use the Phase 2 aggregate for a significance claim. Repair the harness and rerun only affected scenarios plus a small regression sample; do not repeat all 1,440 episodes.
 
 ---
 
-## 3. The Publication Strategy & Terminal-Bench 2.1
+## 3. Publication Strategy & Claims
 
-While our custom headless benchmark provides excellent signal, top-tier AI workshops require validation against established, open-source community benchmarks. 
+Use **Terminal-Bench 2.1** for external validation across its 89 containerized tasks. Treat the custom H1–H24 suite as a mechanism study.
 
-We will target **Terminal-Bench 2.1**. 
-*   **Why?** Terminal-Bench evaluates "Terminal Mastery" across 89 live, containerized OS-level workflows (kernel compilation, git server setup). It perfectly targets the complex, long-horizon failure modes that `batched-queue` is designed to solve.
-*   **Expected Outcome:** `batched-queue` will compress the long-horizon context windows required by Terminal-Bench, dramatically improving the pass@1 rate of frontier models.
+The hypothesis remains an empirical question. Do not predict a dramatic pass@1 gain or use “proves” language before the external results exist. The strongest claim supported by the current evidence is:
+
+> For some short, dependent and stateful tool workflows, explicit batching reduces orchestration boundaries; its effects on resolution, latency, and cost are workload-dependent.
+
+A workshop paper should report positive, null, and negative results and include:
+
+* a neutral tool-availability comparison where the model may choose whether to use `batch_queue`;
+* a forced native-sequential versus forced batch-explicit mechanism comparison;
+* an executor-only ablation that replays the same frozen actions through sequential and batched execution;
+* an unrestricted native baseline that may use compound shell commands;
+* failure analysis for every task resolved by only one condition.
 
 ---
 
-## 4. Execution Plan & Strict Validation Rules
+## 4. Cost-Conscious Execution Plan & Validation Gates
 
-To preserve experimental integrity per `WORK-UNITS.md` and `terminal-bench/RUNBOOK.md`, the next phase must strictly adhere to the following sequence:
+Follow `WORK-UNITS.md` and `terminal-bench/RUNBOOK.md`. Stop at the first failed gate; preserve artifacts and do not spend through a harness defect.
 
-### Step 1: Upgrading the Adapter (Unit T1)
-Our current adapter scaffold (`benchmarks/terminal-bench/types.ts`) targets an older prototype (v0.1.1). 
-*   **Action:** Upgrade the scaffold to pull the verified 89 tasks from Terminal-Bench 2.1.
-*   **Control:** Ensure Docker container images, timeouts, permissions, and dataset versions remain strictly identical between adapter runs.
+### Step 0: Repair the controlled harness
 
-### Step 2: Dry-Run Validation
-*   **Action:** Run `bun run benchmarks/terminal-bench/run.ts --validate` and `--dry-run`.
-*   **Control:** Verify the adapter exposes `batch_queue` correctly and maintains strict parity with the native condition toolset. Do not launch a paid run yet (Budget Gate = $0).
+Before citing or rerunning H1–H24:
 
-### Step 3: Cloud Pilot (Unit E1)
-Deploy a SkyPilot instance to run a no-cost configuration pilot or extremely small subset block. 
-*   **Action:** Parse the `batch_queue` invocations, tool-call count, and execution time to ensure the harness functions accurately at scale.
+* fix H8, H10, and H21;
+* place oracle specifications outside the agent-visible workspace;
+* count only `outcome === "pass"` in headline success;
+* compute per-run total cost before aggregation;
+* record a randomization seed and execution order;
+* analyze task families rather than treating repeated episodes as independent tasks.
 
-### Step 4: Full Suite Cloud Execution (Unit E2)
-Run the full 89 tasks.
-*   **Conditions:** Native vs Batch-Explicit. 
-*   **Resolution:** Pass@1 task resolution (1 repetition per task) paired with confidence intervals.
-*   **Controls:** Randomize condition order, separate cold-cache vs warm-cache results. Keep deterministic and provider-dependent results separate.
+Rerun the three affected scenarios and 3–5 representative regression scenarios with 3 repetitions per condition. A full 20-repetition rerun is unnecessary unless these checks reveal broader drift.
 
-### Step 5: Draft the Paper
-Synthesize metrics (turns, model calls, p95 latency, input/output tokens, verification pass rate, correct fast-fail behavior) into the manuscript. Highlight the trade-off: higher execution cost for extreme reliability gains.
+### Step 1: Pin and validate the Terminal-Bench adapter (Unit T1)
+
+* Pin the exact Terminal-Bench 2.1 revision, 89-task list, container image digests, Pi version, queue commit, model deployment, permissions, timeout, concurrency, and budget.
+* Ensure both conditions have the same underlying filesystem and shell authority. The only intended treatment difference is tool availability or the explicitly declared forced-use instruction.
+* Run `bash benchmarks/terminal-bench/run.sh validate` at Budget Gate = $0; it resolves the pinned dataset and checks condition flags without starting a container or calling a model.
+
+### Step 2: No-cost and tiny paid pilot (Unit E1)
+
+Run configuration validation first, then one paid `fix-git` smoke episode. After that succeeds, run at most 3 representative tasks × 2 conditions × 1 repetition. Verify:
+
+* fresh paired containers and task-owned tests;
+* seeded within-task condition-order randomization;
+* outcome taxonomy, timeout handling, and complete artifact retention;
+* tool/action parsing, model turns, tokens, cost, and latency;
+* no oracle or answer leakage;
+* unrestricted native behavior is not artificially forced into a weak action pattern.
+
+If any check fails, stop the job, preserve logs, repair, and repeat only the pilot.
+
+### Step 3: Full-suite pass@1 (Unit E2)
+
+After the pilot gate passes, run 89 tasks × 2 primary conditions once per task (178 episodes):
+
+1. unrestricted native tools under a neutral task prompt;
+2. the same native authority plus `batch_queue`, also under a neutral task prompt.
+
+Use paired fresh containers and record the seeded condition order. Headline analysis must include:
+
+* pass@1 with timeout, provider error, and invalid runs counted as failures;
+* paired bootstrap confidence intervals over tasks;
+* exact McNemar test for paired resolution outcomes;
+* latency and cost over all tasks with the declared timeout/cost cap, plus a separately labeled jointly-resolved analysis;
+* per-task outcomes and discordant-task failure analysis.
+
+Cold-cache results are primary. Run warm-cache analysis only if the cache state can be defined and reproduced.
+
+### Step 4: Minimal robustness block
+
+Estimate stochasticity on a preregistered stratified subset of 20 tasks with 2 additional repetitions per condition (80 episodes). If budget permits, run one cheaper or open model on 20 tasks × 2 conditions (40 episodes); skip this second model before weakening the primary controls.
+
+The publication target is therefore 258 required external episodes, or 298 with the second-model check—not a repeat of the 1,440-episode synthetic run.
+
+### Step 5: Cheap ablations
+
+Replay frozen action plans through sequential and batched executors without asking a model to replan. Measure orchestration latency, state persistence, binding, structured evidence size, and fast-fail behavior. These deterministic ablations should have zero or negligible model cost.
+
+### Step 6: Draft the paper
+
+Report task-level uncertainty, all exclusions, negative results, model/provider configuration, raw aggregate artifacts, and reproducible analysis commands. Use a bounded conclusion rather than claiming universal reliability or latency gains.
 
 ---
 
