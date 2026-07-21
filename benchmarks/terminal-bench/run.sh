@@ -63,6 +63,18 @@ pilot_plan() {
   make_plan "${TASKS[@]}"
 }
 
+require_valid_job() {
+  local job_dir=$1 outcome
+  outcome=$("$PYTHON" benchmarks/terminal-bench/summarize.py "$job_dir" |
+    "$PYTHON" -c 'import json,sys; rows=json.load(sys.stdin)["runs"]; print(rows[0]["outcome"] if rows else "invalid")')
+  case "$outcome" in
+    invalid|provider_error)
+      echo "Stopping after harness/provider failure in $job_dir ($outcome)." >&2
+      return 1
+      ;;
+  esac
+}
+
 dataset_checkout() {
   local checkout="$ROOT/.cache/terminal-bench-2-1"
   if [[ ! -d "$checkout/.git" ]]; then
@@ -177,6 +189,7 @@ PY
         "$HARBOR" run "${common[@]}" --include-task-name "$task" \
           --model "$BQ_MODEL" --ak "condition=$condition" --ak "thinking=$BQ_THINKING" \
           --job-name "$task-$condition" --jobs-dir "$run_dir"
+        require_valid_job "$run_dir/$task-$condition"
       done
     done < "$run_dir/plan.txt"
     "$PYTHON" benchmarks/terminal-bench/summarize.py "$run_dir" | tee "$run_dir/summary.json"
