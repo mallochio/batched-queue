@@ -1,1 +1,1 @@
-harbor==0.20.0
+harbor @ git+https://github.com/harbor-framework/harbor.git@1393655243125f1d63f81f9bd2f217eefaba3633
