@@ -4,15 +4,23 @@ Working outline for a workshop or short empirical paper.
 
 ## Submission target
 
-Best fit among the deadlines supplied: **DAI 2026, AI Paper Track** (deadline
-listed as 11 August 2026). The topic is broad enough for an agent-interface
-study and the remaining deadline leaves time to finish the evaluation.
+Primary target: a **NeurIPS 2026 workshop on agent verification or evaluation**,
+especially *Who Verifies the Agents? Toward Reliable Agent Development*. The
+workshop's themes include verification, cost and latency signals, failure
+attribution, regression detection, reproducibility, and evaluation tooling.
+NeurIPS lists 29 August 2026 as the suggested date for workshop contributions
+and 29 September as the mandatory author-notification deadline; the individual
+workshop CFP controls the actual paper deadline. NeurIPS workshop papers are
+non-archival, which keeps a later archival submission possible subject to the
+venue's rules.
 
-EACL 2027 is a weaker fit unless the paper is reframed around language-agent
-tool interaction. The AAAI and KDD abstract deadlines in the supplied calendar
-appear to have passed. NeurIPS/ICLR workshops remain good venues if a suitable
-call opens, but the paper should not wait for a positive result before being
-written.
+Secondary target: **DAI 2026, AI Paper Track** (deadline listed as 11 August
+2026). The topic is broad enough for an agent-interface study. AAAI-27 may also
+work if a relevant agentic-AI or software-engineering workshop opens, but AAAI
+does not publish workshop technical reports in its digital library. ICLR 2026
+and ICML 2026 workshop deadlines have passed; target their 2027 workshops
+instead. CVPR and ICCV are poor fits unless the project adds a genuine
+vision-language or embodied-agent component.
 
 ## Working title
 
