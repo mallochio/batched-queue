@@ -298,8 +298,10 @@ evidence or proof that the underlying model became intrinsically smarter.
 Before using the numbers as marketing claims, replace wording-based predicates
 with hidden filesystem/command validators, directly account for internal
 objective-planner usage, and repeat on a fresh held-out task set. See
-[`benchmarks/harness/README.md`](./benchmarks/harness/README.md) for the
-reproducible protocol.
+[`benchmarks/PUBLICATION_READINESS.md`](./benchmarks/PUBLICATION_READINESS.md)
+for the evidence audit and submission gates, and
+[`benchmarks/PAPER_OUTLINE.md`](./benchmarks/PAPER_OUTLINE.md) for the workshop
+draft outline.
 
 ## Research inspirations
 

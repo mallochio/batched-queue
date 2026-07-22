@@ -1,6 +1,8 @@
 # When does tool-action batching help terminal agents?
 
-Working outline for a workshop or short empirical paper.
+Working outline for a workshop or short empirical paper. For the current
+evidence audit, blocking gaps, claim ladder, and submission checklist, see
+[`PUBLICATION_READINESS.md`](./PUBLICATION_READINESS.md).
 
 ## Submission target
 

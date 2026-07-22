@@ -2,6 +2,10 @@
 
 **Goal:** Prepare a workshop paper for ICML / ICLR / NeurIPS demonstrating that migrating LLM coding agents from a single-step Sequential Read-Eval-Print-Loop (REPL) to a Queue-based Batch Architecture significantly improves task completion reliability and cuts network-bound latency.
 
+For the current evidence audit and submission checklist, see
+[`PUBLICATION_READINESS.md`](./PUBLICATION_READINESS.md). Do not treat the
+interim Terminal-Bench prefix or unrepaired Phase 2 aggregates as final claims.
+
 The central hypothesis is:
 > *For short, dependent repository workflows, `batch_queue` reduces model/tool interaction turns while preserving action-level structure, shell state, failure boundaries, and final correctness.*
 
