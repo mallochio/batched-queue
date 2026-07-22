@@ -104,6 +104,18 @@ bun test
 bun run typecheck
 ```
 
+Python benchmark tooling uses the single root environment managed by `uv`:
+
+```bash
+uv sync
+uv run python benchmarks/terminal_bench_agent.py
+bash benchmarks/terminal-bench/run.sh validate
+```
+
+The Python version is pinned to 3.12 for the Harbor benchmark dependency. Do
+not create a separate benchmark virtual environment; use `uv run` or the
+repository's `.venv/bin` entry points.
+
 You can also load it without installing:
 
 ```bash

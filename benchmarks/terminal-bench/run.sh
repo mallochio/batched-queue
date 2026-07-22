@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-HARBOR=${HARBOR:-"$ROOT/.venv_harbor/bin/harbor"}
-PYTHON=${PYTHON:-"$ROOT/.venv_harbor/bin/python"}
+HARBOR=${HARBOR:-"$ROOT/.venv/bin/harbor"}
+PYTHON=${PYTHON:-"$ROOT/.venv/bin/python"}
 TB_COMMIT=36d417f56c293b8271b306a0e4c566f58e98c153
 TB_REPO="https://github.com/harbor-framework/terminal-bench-2-1.git@$TB_COMMIT"
 AGENT=benchmarks.terminal_bench_agent:BatchedQueuePi

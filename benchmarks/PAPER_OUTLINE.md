@@ -166,7 +166,7 @@ Conditions:
 - Dataset commit: `36d417f56c293b8271b306a0e4c566f58e98c153`.
 - 89 tasks from the official `harbor-framework/terminal-bench-2-1` repository.
 - Harbor commit: record the exact pinned commit from
-  `benchmarks/terminal-bench/requirements.txt`.
+  root `pyproject.toml` and `uv.lock`.
 - Pi: `0.80.3`.
 - Driver: `azure-openai-responses/gpt-5.6-luna`, thinking `high`.
 - One fresh container per task-condition pair.

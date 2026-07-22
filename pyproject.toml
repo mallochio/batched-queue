@@ -1,0 +1,11 @@
+[project]
+name = "batched-queue-tools"
+version = "0.1.0"
+description = "Python tooling for the batched-queue benchmarks"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "harbor @ git+https://github.com/harbor-framework/harbor.git@1393655243125f1d63f81f9bd2f217eefaba3633",
+]
+
+[tool.uv]
+package = false

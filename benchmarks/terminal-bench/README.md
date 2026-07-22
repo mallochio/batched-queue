@@ -8,11 +8,23 @@ The primary comparison uses the same `BatchedQueuePi` agent and neutral task
 instruction in both conditions. `condition=batch` adds only the pinned local
 `batch_queue` extension; `condition=native` does not load it.
 
+## Python environment
+
+The repository uses one Python environment managed by `uv` from the root
+`pyproject.toml` and `uv.lock`:
+
+```bash
+uv sync
+```
+
+This installs the pinned Harbor dependency and creates `.venv/`. The runner
+uses that environment by default; override `PYTHON` or `HARBOR` only when
+running in a separately provisioned environment.
+
 ## No-cost validation
 
 ```bash
-python3.12 -m venv .venv_harbor
-.venv_harbor/bin/pip install -r benchmarks/terminal-bench/requirements.txt
+uv run python benchmarks/terminal_bench_agent.py
 bash benchmarks/terminal-bench/run.sh validate
 ```
 
@@ -102,6 +114,6 @@ After completion, compute task-level paired bootstrap intervals and the exact
 McNemar test from the generated summary:
 
 ```bash
-.venv_harbor/bin/python benchmarks/terminal-bench/analyze.py \
+uv run python benchmarks/terminal-bench/analyze.py \
   "$BQ_RUN_DIR/summary.json"
 ```
