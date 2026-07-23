@@ -54,6 +54,7 @@ Research and publication docs live under [`benchmarks/`](./benchmarks/):
 
 | Doc | Role |
 | --- | --- |
+| [`benchmarks/README.md`](./benchmarks/README.md) | Benchmark index and current status |
 | [`benchmarks/PUBLICATION_READINESS.md`](./benchmarks/PUBLICATION_READINESS.md) | Evidence audit, claim ladder, submission gates |
 | [`benchmarks/PAPER_OUTLINE.md`](./benchmarks/PAPER_OUTLINE.md) | Workshop / short-paper outline |
 | [`benchmarks/RESEARCH_RUNBOOK.md`](./benchmarks/RESEARCH_RUNBOOK.md) | Experiment history and execution plan |
