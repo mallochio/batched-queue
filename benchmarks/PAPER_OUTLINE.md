@@ -2,7 +2,12 @@
 
 Working outline for a workshop or short empirical paper. For the current
 evidence audit, blocking gaps, claim ladder, and submission checklist, see
-[`PUBLICATION_READINESS.md`](./PUBLICATION_READINESS.md).
+[`PUBLICATION_READINESS.md`](./PUBLICATION_READINESS.md). Doc index:
+[`README.md`](./README.md).
+
+**Status (July 2026):** not submission-ready. Controlled fixtures are directional
+only; Terminal-Bench full paired run is incomplete (45/89). Prefer the fallback
+title until the full external result and failure analysis are frozen.
 
 ## Submission target
 

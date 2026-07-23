@@ -1,8 +1,8 @@
 # Publication readiness: evidence audit and next steps
 
-Status snapshot as of the current `main` tip. This is a decision document, not a
-paper draft. Use it to decide what to finish before submitting
-[`PAPER_OUTLINE.md`](./PAPER_OUTLINE.md).
+Status snapshot as of **23 July 2026** (`main` / docs sync). This is a decision
+document, not a paper draft. Use it to decide what to finish before submitting
+[`PAPER_OUTLINE.md`](./PAPER_OUTLINE.md). Doc index: [`README.md`](./README.md).
 
 ## Verdict
 
@@ -37,8 +37,11 @@ prefix.
 | Terminal-Bench pilot | 3 tasks × 2 conditions | all pass; efficiency wins when queue used | harness validation only |
 | Terminal-Bench full run | **45 / 89 pairs** interim | batch 29/45 vs native 32/45; McNemar p=0.5488; batch slower/costlier | incomplete; not a full-benchmark claim |
 
-Sources: [`README.md`](../README.md), [`RESEARCH_RUNBOOK.md`](./RESEARCH_RUNBOOK.md),
-[`PAPER_OUTLINE.md`](./PAPER_OUTLINE.md), [`terminal-bench/PILOT_REPORT.md`](./terminal-bench/PILOT_REPORT.md).
+Sources: [`README.md`](./README.md) (this directory),
+[`../README.md`](../README.md), [`RESEARCH_RUNBOOK.md`](./RESEARCH_RUNBOOK.md),
+[`PAPER_OUTLINE.md`](./PAPER_OUTLINE.md),
+[`terminal-bench/PILOT_REPORT.md`](./terminal-bench/PILOT_REPORT.md),
+[`harness/README.md`](./harness/README.md).
 
 Raw Terminal-Bench artifacts are gitignored under `benchmarks/results/` and are
 absent from this environment. The interim 45-pair numbers live only in the paper
@@ -131,7 +134,8 @@ outline until the frozen run directory is restored and re-analyzed.
 8. **Robustness block** from the runbook: 20 stratified tasks × 2 extra reps.
 9. **Second cheaper/open model** only after primary controls are solid.
 10. **Related work and limitations** drafted against the final numbers.
-11. **Missing `benchmarks/harness/README.md`** linked from the root README.
+11. **Missing harness protocol doc** — addressed by
+    [`harness/README.md`](./harness/README.md); keep it aligned with code fixes.
 12. **Author checklist:** one coauthor independently verifies the discordant
     table and McNemar / bootstrap outputs.
 
@@ -191,7 +195,8 @@ Suggested titles by outcome:
 [ ] Fix H8/H10/H21 + aggregate outcome accounting; regression-rerun only
 [ ] Add executor-only and independent-read ablations
 [ ] Draft Sections 3–4, then abstract/title
-[ ] Add harness README; align root README claims with final evidence
+[ ] Keep harness README aligned after oracle/aggregate repairs
+[ ] Align root README claims with final evidence
 [ ] Coauthor audit of tables and stats
 [ ] Submit to chosen workshop / DAI track
 ```

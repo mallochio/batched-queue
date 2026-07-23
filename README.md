@@ -29,6 +29,7 @@ The queue executes `read_lines`, `grep_pattern`, `execute_bash`, and `apply_diff
 batched-queue/
 ├── README.md
 ├── package.json
+├── pyproject.toml        # uv-managed Harbor / Terminal-Bench tooling
 ├── src/                  # extension and library source
 │   ├── extension.ts      # Pi extension entry point
 │   ├── opencode/         # OpenCode plugin adapter
@@ -36,6 +37,11 @@ batched-queue/
 │   ├── executors/        # action executors
 │   ├── diff-validation/  # diff matching and syntax checks
 │   └── lib/              # shared utilities
+├── benchmarks/           # research harnesses, adapters, and publication docs
+│   ├── harness/          # H1–H24 controlled fixture suite
+│   ├── deterministic/    # model-free executor mechanics (D1–D7)
+│   ├── terminal-bench/   # Terminal-Bench 2.1 Harbor adapter
+│   └── results/          # local run artifacts (gitignored)
 ├── .opencode/            # OpenCode plugin entry + install docs
 ├── .pi/                  # Pi config example
 ├── tests/                # unit, integration, and smoke tests
@@ -43,6 +49,16 @@ batched-queue/
     ├── install.sh        # Pi install helper
     └── install-opencode.sh
 ```
+
+Research and publication docs live under [`benchmarks/`](./benchmarks/):
+
+| Doc | Role |
+| --- | --- |
+| [`benchmarks/PUBLICATION_READINESS.md`](./benchmarks/PUBLICATION_READINESS.md) | Evidence audit, claim ladder, submission gates |
+| [`benchmarks/PAPER_OUTLINE.md`](./benchmarks/PAPER_OUTLINE.md) | Workshop / short-paper outline |
+| [`benchmarks/RESEARCH_RUNBOOK.md`](./benchmarks/RESEARCH_RUNBOOK.md) | Experiment history and execution plan |
+| [`benchmarks/harness/README.md`](./benchmarks/harness/README.md) | Controlled H1–H24 protocol |
+| [`benchmarks/terminal-bench/README.md`](./benchmarks/terminal-bench/README.md) | External Terminal-Bench 2.1 adapter |
 
 ## Requirements
 
@@ -254,16 +270,24 @@ Do **not** use `batch_queue` for a single obvious read/search/command, independe
 
 ## Benchmark status
 
-The repository includes an executable Pi benchmark harness under
-[`benchmarks/harness/`](./benchmarks/harness/). It compares native sequential
-tools, explicit `batch_queue` actions, and objective-planned batches on fresh
-deterministic fixtures while recording task verification, model turns, tool
-calls, actions, tokens, cost, latency, result bytes, retries, and fast-fail
-metadata.
+`batch_queue` is evaluated as a **bounded interface change**, not as a claim
+that the underlying model became smarter. Current evidence supports interaction
+compression on short dependent fixture workflows; it does **not** yet support a
+general Terminal-Bench reliability or efficiency win. See
+[`benchmarks/PUBLICATION_READINESS.md`](./benchmarks/PUBLICATION_READINESS.md)
+for the full audit and submission gates.
+
+### Controlled fixture suite (directional)
+
+The Pi harness under [`benchmarks/harness/`](./benchmarks/harness/) compares
+native sequential tools, explicit `batch_queue` actions, and objective-planned
+batches on fresh deterministic fixtures. It records verification, model turns,
+tool calls, actions, tokens, cost, latency, result bytes, retries, and
+fast-fail metadata.
 
 The initial Luna study used 24 tasks, two observations per task/condition,
 `gpt-5.6-luna` at Pi `xhigh`, and `gpt-5.4-mini` at high for objective
-planning. It cost $6.05 in reported API usage across 144 episodes:
+planning ($6.05 reported API usage across 144 episodes):
 
 | condition | verified success | median tool calls |
 | --- | ---: | ---: |
@@ -271,17 +295,8 @@ planning. It cost $6.05 in reported API usage across 144 episodes:
 | explicit `batch_queue` | 83.3% | 1.0 |
 | objective `batch_queue` | 64.6% | 2.5 |
 
-These are directional results, not a statistically conclusive claim. They
-support the hypothesis that explicit batching can improve **effective agent
-capability** on longer dependent coding workflows: the same driver completed
-more validator-checked tasks with fewer orchestration calls. They do not show
-that the underlying language model became intrinsically smarter. Objective mode
-also adds planner latency and was less reliable in this initial study.
-
-A follow-up provider validation used the same 24-task deterministic fixture
-suite with Azure OpenAI, `gpt-5.6-luna` as the driver, and Azure's `grok-4.3`
-deployment as the objective executor. Across 144 episodes and two observations
-per cell, the aggregate results were:
+A follow-up Azure provider check on the same 24-task suite (`gpt-5.6-luna`
+driver, Azure `grok-4.3` objective executor) was directionally similar:
 
 | condition | verified success | median tool calls | median cost |
 | --- | ---: | ---: | ---: |
@@ -289,19 +304,46 @@ per cell, the aggregate results were:
 | explicit `batch_queue` | 83% | 1 | $0.0132 |
 | objective `batch_queue` | 77% | 1 | $0.0099 |
 
-This follow-up is still pilot-scale: three episodes timed out, each cell has
-only two observations, and the suite is custom rather than Terminal-Bench or
-SWE-bench. It validates the Azure provider path and supports the same
-directional interaction-compression hypothesis; it is not external benchmark
-evidence or proof that the underlying model became intrinsically smarter.
+These are pilot-scale and custom-fixture results. A larger Phase 2 cloud run
+(1,440 episodes) remains archived for provenance only: known oracle and
+aggregation defects mean those aggregates are **not** publication-ready. Repair
+and regression-rerun instructions are in the research runbook.
 
-Before using the numbers as marketing claims, replace wording-based predicates
-with hidden filesystem/command validators, directly account for internal
-objective-planner usage, and repeat on a fresh held-out task set. See
-[`benchmarks/PUBLICATION_READINESS.md`](./benchmarks/PUBLICATION_READINESS.md)
-for the evidence audit and submission gates, and
-[`benchmarks/PAPER_OUTLINE.md`](./benchmarks/PAPER_OUTLINE.md) for the workshop
-draft outline.
+### Terminal-Bench 2.1 (external)
+
+The Harbor adapter under [`benchmarks/terminal-bench/`](./benchmarks/terminal-bench/)
+pins Terminal-Bench 2.1 (89 tasks), Harbor `0.20.0`, and Pi `0.80.3`. The
+primary comparison is neutral tool availability: native tools alone versus the
+same authority with `batch_queue` available.
+
+- **Pilot (complete):** 3 tasks × 2 conditions, all official-verifier passes,
+  ~$0.57. Queue adoption on 2/3 batch episodes. See
+  [`benchmarks/terminal-bench/PILOT_REPORT.md`](./benchmarks/terminal-bench/PILOT_REPORT.md).
+- **Full paired run (incomplete):** 45 of 89 task pairs reported so far show
+  batch 29/45 vs native 32/45 (McNemar p≈0.55), with higher median latency,
+  turns, tool calls, tokens, and cost for batch. This prefix is **not** a
+  completed Terminal-Bench evaluation. Finish all 89 pairs before citing an
+  external result.
+
+Raw job artifacts under `benchmarks/results/` are gitignored and must be
+archived separately for reproducibility.
+
+### How to run
+
+```bash
+# Model-free executor mechanics
+bun run bench:deterministic
+
+# Controlled fixture harness (requires provider credentials)
+bun run bench:model-mediated
+
+# Terminal-Bench adapter validation (no containers / no model spend)
+uv sync
+bash benchmarks/terminal-bench/run.sh validate
+```
+
+Workshop draft outline:
+[`benchmarks/PAPER_OUTLINE.md`](./benchmarks/PAPER_OUTLINE.md).
 
 ## Research inspirations
 

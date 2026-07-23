@@ -1,10 +1,15 @@
 # Batched Queue: Master Research & Publication Runbook
 
-**Goal:** Prepare a workshop paper for ICML / ICLR / NeurIPS demonstrating that migrating LLM coding agents from a single-step Sequential Read-Eval-Print-Loop (REPL) to a Queue-based Batch Architecture significantly improves task completion reliability and cuts network-bound latency.
+**Goal:** Prepare a workshop paper that studies when a typed tool-action queue
+helps terminal agents — measuring reliability, interaction boundaries, cost,
+and latency under controlled fixtures and Terminal-Bench 2.1. The open question
+is empirical; do not assume a universal reliability or latency win.
 
 For the current evidence audit and submission checklist, see
 [`PUBLICATION_READINESS.md`](./PUBLICATION_READINESS.md). Do not treat the
 interim Terminal-Bench prefix or unrepaired Phase 2 aggregates as final claims.
+
+Doc index: [`README.md`](./README.md).
 
 The central hypothesis is:
 > *For short, dependent repository workflows, `batch_queue` reduces model/tool interaction turns while preserving action-level structure, shell state, failure boundaries, and final correctness.*
@@ -48,6 +53,20 @@ The archived Phase 2 report is retained for provenance, not as publication-ready
 
 Do not use the Phase 2 aggregate for a significance claim. Repair the harness and rerun only affected scenarios plus a small regression sample; do not repeat all 1,440 episodes.
 
+### Phase 3: Terminal-Bench 2.1 external validation (in progress)
+
+*   **Adapter:** Harbor `0.20.0`, Pi `0.80.3`, dataset commit
+    `36d417f56c293b8271b306a0e4c566f58e98c153` (89 tasks).
+*   **Pilot:** Complete. 3 tasks × 2 neutral conditions, all verifier passes,
+    ~$0.57, queue adoption on 2/3 batch episodes. See
+    [`terminal-bench/PILOT_REPORT.md`](./terminal-bench/PILOT_REPORT.md).
+*   **Full paired run:** Incomplete. Interim checkpoint at 45/89 pairs:
+    batch 29/45 vs native 32/45 (McNemar p≈0.55); batch higher on median
+    latency, turns, tool calls, tokens, and cost. Resume the frozen run
+    directory; do not treat the prefix as a finished external result.
+*   **Next:** Finish 89 pairs, archive artifacts, run `analyze.py`, then
+    discordant-task failure analysis before locking the abstract.
+
 ---
 
 ## 3. Publication Strategy & Claims
@@ -70,7 +89,9 @@ A workshop paper should report positive, null, and negative results and include:
 
 ## 4. Cost-Conscious Execution Plan & Validation Gates
 
-Follow `WORK-UNITS.md` and `terminal-bench/RUNBOOK.md`. Stop at the first failed gate; preserve artifacts and do not spend through a harness defect.
+Follow [`PUBLICATION_READINESS.md`](./PUBLICATION_READINESS.md) and
+[`terminal-bench/README.md`](./terminal-bench/README.md). Stop at the first
+failed gate; preserve artifacts and do not spend through a harness defect.
 
 ### Step 0: Repair the controlled harness
 
@@ -138,7 +159,14 @@ Report task-level uncertainty, all exclusions, negative results, model/provider 
 ---
 
 # Appendix: Historical Plans and Runbooks
-The following sections contain the verbatim historical planning documents, work unit definitions, and validation rules that guided the earlier phases of this research. They are preserved here for historical context.
+
+The following sections contain the verbatim historical planning documents, work
+unit definitions, and validation rules that guided earlier phases. They are
+preserved for provenance. Filenames cited inside the archives (for example
+`WORK-UNITS.md`, `RESULTS-TEMPLATE.md`, `terminal-bench/RUNBOOK.md`) were
+consolidated into this runbook and the live docs under
+[`README.md`](./README.md). Prefer the live docs for current commands and
+status; treat archive-internal links as historical labels, not filesystem paths.
 
 
 

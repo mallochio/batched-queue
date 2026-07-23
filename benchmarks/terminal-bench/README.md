@@ -8,6 +8,19 @@ The primary comparison uses the same `BatchedQueuePi` agent and neutral task
 instruction in both conditions. `condition=batch` adds only the pinned local
 `batch_queue` extension; `condition=native` does not load it.
 
+## Current status
+
+| Stage | State |
+| --- | --- |
+| Adapter validate / install-check | Ready (`run.sh validate`) |
+| Paid smoke (`fix-git`, batch) | Gate implemented |
+| Paired pilot (3 tasks × 2 conditions) | **Complete** — [`PILOT_REPORT.md`](./PILOT_REPORT.md) |
+| Full paired run (89 × 2) | **Incomplete** — 45/89 pairs reported interim in [`../PAPER_OUTLINE.md`](../PAPER_OUTLINE.md); not a finished external result |
+| Artifact archive | Raw jobs under `benchmarks/results/` (gitignored); restore before claiming reproducibility |
+
+Do not cite the 45-pair prefix as a completed Terminal-Bench evaluation. See
+[`../PUBLICATION_READINESS.md`](../PUBLICATION_READINESS.md).
+
 ## Python environment
 
 The repository uses one Python environment managed by `uv` from the root
@@ -117,3 +130,8 @@ McNemar test from the generated summary:
 uv run python benchmarks/terminal-bench/analyze.py \
   "$BQ_RUN_DIR/summary.json"
 ```
+
+Paste script output into the paper tables; do not hand-transcribe. Until all
+89 pairs are present (or exclusions are predeclared), keep the result labeled
+interim in [`../PAPER_OUTLINE.md`](../PAPER_OUTLINE.md) and
+[`../PUBLICATION_READINESS.md`](../PUBLICATION_READINESS.md).

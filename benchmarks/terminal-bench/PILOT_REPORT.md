@@ -7,6 +7,8 @@
 - Seed: `42`
 - Episodes: 3 tasks × 2 neutral tool-availability conditions
 - Raw artifact: `benchmarks/results/terminal-bench/pilot-20260721T114236Z/` (gitignored)
+- Status: **pilot complete**; full 89-pair run remains incomplete — see
+  [`../PUBLICATION_READINESS.md`](../PUBLICATION_READINESS.md)
 
 | Task | Condition | Pass | Agent s | Turns | Tool calls | Batch actions | Tokens¹ | Cost |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
