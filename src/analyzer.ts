@@ -65,16 +65,32 @@ async function importCompatCompleteFromDist(): Promise<CompleteImplementation> {
 	).href;
 	const compatModule = await import(compatUrl);
 	if (!isCompleteModule(compatModule)) {
-		throw new Error("@earendil-works/pi-ai compat module does not export complete()");
+		throw new Error("pi-ai compat module does not export complete()");
 	}
 	return compatModule.complete;
 }
 
+/**
+ * Host packages that may provide complete(), in preference order.
+ *
+ * Pi ships `@earendil-works/pi-ai`; Oh My Pi ships `@oh-my-pi/pi-ai`. Probing
+ * both keeps one extension build working on either harness.
+ */
+const PI_AI_SPECIFIERS = ["@earendil-works/pi-ai", "@oh-my-pi/pi-ai"];
+
 async function resolvePiAiEntrypointUrl(): Promise<string> {
-	if (typeof import.meta.resolve === "function") {
-		return import.meta.resolve("@earendil-works/pi-ai");
+	const failures: string[] = [];
+	for (const specifier of PI_AI_SPECIFIERS) {
+		try {
+			if (typeof import.meta.resolve === "function") {
+				return import.meta.resolve(specifier);
+			}
+			return pathToFileURL(require.resolve(specifier)).href;
+		} catch (error) {
+			failures.push(`${specifier}: ${(error as Error).message}`);
+		}
 	}
-	return pathToFileURL(require.resolve("@earendil-works/pi-ai")).href;
+	throw new Error(`cannot resolve a pi-ai host module (${failures.join("; ")})`);
 }
 
 export async function resolveCompleteImplementation(): Promise<CompleteImplementation> {
