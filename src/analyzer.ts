@@ -3,7 +3,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Api, Message, Model, Tool, ToolCall, Usage } from "@earendil-works/pi-ai";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+// See the note in `schemas.ts`: always use the `/type` subpath so the schema
+// builder stays on the same TypeBox instance as `/value`'s validator.
+import { Type } from "@sinclair/typebox/type";
 import type { ActionBatchPayload } from "./payload.js";
 import type { ResolvedBatchQueueConfig } from "./config.js";
 import {

@@ -1,4 +1,10 @@
-import { Type, type Static } from "@sinclair/typebox";
+// NOTE: import from the `/type` subpath, never bare `@sinclair/typebox`.
+// Oh My Pi's extension loader rewrites the bare specifier to a zod-backed
+// compatibility shim that emits plain JSON Schema without TypeBox's `Kind`
+// symbols, which makes `Value.Check` (loaded from `/value`) throw
+// "Unknown type". Subpath specifiers are passed through untouched, so this
+// keeps the schema builder and the validator on the same TypeBox instance.
+import { Type, type Static } from "@sinclair/typebox/type";
 import {
 	ACTION_TYPES,
 	DEFAULT_MAX_BATCH_ACTIONS,

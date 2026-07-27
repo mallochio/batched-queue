@@ -22,6 +22,7 @@ import {
 	createActionBatchPayloadSchema,
 	createBatchExecutionResultSchema,
 	createSubmitActionBatchToolSchema,
+	QueueActionSchema,
 } from "../src/schemas.js";
 
 describe("ActionBatchPayload validation", () => {
@@ -247,5 +248,46 @@ describe("result schema", () => {
 		expect(Value.Check(createActionBatchPayloadSchema(), { actions: [] })).toBe(
 			false,
 		);
+	});
+});
+
+describe("typebox instance consistency", () => {
+	const KIND = Symbol.for("TypeBox.Kind");
+
+	it("builds schemas carrying TypeBox Kind symbols", () => {
+		// Oh My Pi rewrites bare `@sinclair/typebox` imports to a zod-backed shim
+		// that emits symbol-less JSON Schema, which makes `Value.Check` throw
+		// "Unknown type". Schemas must come from the real TypeBox instance.
+		const payload = createActionBatchPayloadSchema();
+		expect((payload as unknown as Record<symbol, unknown>)[KIND]).toBe("Object");
+		expect((QueueActionSchema as unknown as Record<symbol, unknown>)[KIND]).toBe(
+			"Union",
+		);
+		expect(
+			(createBatchExecutionResultSchema() as unknown as Record<symbol, unknown>)[
+				KIND
+			],
+		).toBe("Object");
+	});
+
+	it("validates a driver-supplied explicit read_lines batch", () => {
+		expect(
+			Value.Check(createActionBatchPayloadSchema(10), {
+				actions: [
+					{ type: "read_lines", path: "buggy.py", startLine: 1, endLine: 5 },
+				],
+			}),
+		).toBe(true);
+	});
+
+	it("never imports the bare @sinclair/typebox specifier in src/", async () => {
+		const { Glob } = await import("bun");
+		const { readFileSync } = await import("node:fs");
+		const offenders: string[] = [];
+		for await (const file of new Glob("src/**/*.ts").scan(".")) {
+			const source = readFileSync(file, "utf8");
+			if (/from\s+["']@sinclair\/typebox["']/.test(source)) offenders.push(file);
+		}
+		expect(offenders).toEqual([]);
 	});
 });
