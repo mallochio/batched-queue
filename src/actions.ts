@@ -1,4 +1,4 @@
-import type { Static } from "@sinclair/typebox/type";
+import type { Static } from "@sinclair/typebox";
 import type { ActionType } from "./constants.js";
 import {
 	ApplyDiffActionSchema,

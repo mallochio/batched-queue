@@ -1,4 +1,3 @@
-import { Value } from "@sinclair/typebox/value";
 import {
 	ACTION_TYPES,
 	DEFAULT_MAX_BATCH_ACTIONS,
@@ -9,56 +8,149 @@ import type { QueueAction, ReadLinesAction } from "./actions.js";
 import type { ActionBatchPayload, UnvalidatedActionBatchPayload } from "./payload.js";
 import type { ActionExecutionResult } from "./results.js";
 import type { ResolvedBatchQueueConfig } from "./config.js";
-import {
-	createActionBatchPayloadSchema,
-	QueueActionSchema,
-	type ActionBatchPayloadSchemaType,
-} from "./schemas.js";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
+	return Object.keys(value).every(key => allowed.includes(key));
+}
+
+function isNonEmptyString(value: unknown): value is string {
+	return typeof value === "string" && value.length > 0;
+}
+
+function isOptionalNonEmptyString(value: unknown): boolean {
+	return value === undefined || isNonEmptyString(value);
+}
+
+function isOptionalBoolean(value: unknown): boolean {
+	return value === undefined || typeof value === "boolean";
+}
+
+function isInteger(value: unknown, minimum: number, maximum?: number): boolean {
+	return (
+		typeof value === "number" &&
+		Number.isInteger(value) &&
+		value >= minimum &&
+		(maximum === undefined || value <= maximum)
+	);
+}
+
+function isOptionalInteger(value: unknown, minimum: number, maximum?: number): boolean {
+	return value === undefined || isInteger(value, minimum, maximum);
+}
+
+function hasValidBinding(value: Record<string, unknown>): boolean {
+	return value.bindTo === undefined || (
+		typeof value.bindTo === "string" &&
+		/^[A-Za-z_][A-Za-z0-9_]*$/.test(value.bindTo)
+	);
+}
+
+function isReadLinesAction(value: Record<string, unknown>): boolean {
+	return (
+		hasOnlyKeys(value, ["type", "path", "startLine", "endLine", "bindTo"]) &&
+		value.type === "read_lines" &&
+		isNonEmptyString(value.path) &&
+		isOptionalInteger(value.startLine, 1) &&
+		isOptionalInteger(value.endLine, 1) &&
+		hasValidBinding(value)
+	);
+}
+
+function isGrepPatternAction(value: Record<string, unknown>): boolean {
+	return (
+		hasOnlyKeys(value, ["type", "pattern", "path", "glob", "caseSensitive", "literal", "contextLines", "bindTo"]) &&
+		value.type === "grep_pattern" &&
+		isNonEmptyString(value.pattern) &&
+		isOptionalNonEmptyString(value.path) &&
+		isOptionalNonEmptyString(value.glob) &&
+		isOptionalBoolean(value.caseSensitive) &&
+		isOptionalBoolean(value.literal) &&
+		isOptionalInteger(value.contextLines, 0, 10) &&
+		hasValidBinding(value)
+	);
+}
+
+function isExecuteBashAction(value: Record<string, unknown>): boolean {
+	return (
+		hasOnlyKeys(value, ["type", "command", "timeoutMs", "bindTo"]) &&
+		value.type === "execute_bash" &&
+		isNonEmptyString(value.command) &&
+		isOptionalInteger(value.timeoutMs, 1) &&
+		hasValidBinding(value)
+	);
+}
+
+function isApplyDiffAction(value: Record<string, unknown>): boolean {
+	return (
+		hasOnlyKeys(value, ["type", "path", "oldText", "newText", "replaceAll", "bindTo"]) &&
+		value.type === "apply_diff" &&
+		isNonEmptyString(value.path) &&
+		typeof value.oldText === "string" &&
+		typeof value.newText === "string" &&
+		isOptionalBoolean(value.replaceAll) &&
+		hasValidBinding(value)
+	);
+}
+
+function isPlanReflection(value: unknown): boolean {
+	return (
+		isRecord(value) &&
+		hasOnlyKeys(value, ["confidence", "successCriteria", "risks", "fallback"]) &&
+		isInteger(value.confidence, 0, 5) &&
+		isNonEmptyString(value.successCriteria) &&
+		Array.isArray(value.risks) &&
+		value.risks.every(risk => typeof risk === "string") &&
+		(value.fallback === undefined || typeof value.fallback === "string")
+	);
+}
 
 export function isActionType(value: string): value is ActionType {
 	return (ACTION_TYPES as readonly string[]).includes(value);
 }
 
 export function isQueueAction(value: unknown): value is QueueAction {
-	return Value.Check(QueueActionSchema, value);
+	return isRecord(value) && (
+		isReadLinesAction(value) ||
+		isGrepPatternAction(value) ||
+		isExecuteBashAction(value) ||
+		isApplyDiffAction(value)
+	);
 }
 
 export function assertQueueAction(value: unknown): asserts value is QueueAction {
-	if (!isQueueAction(value)) {
-		const errors = [...Value.Errors(QueueActionSchema, value)];
-		const detail = errors[0]?.message ?? "invalid queue action";
-		throw new Error(`Invalid queue action: ${detail}`);
-	}
+	if (!isQueueAction(value)) throw new Error("Invalid queue action");
 }
 
 export function isActionBatchPayload(
 	value: unknown,
 	maxBatchActions: number = DEFAULT_MAX_BATCH_ACTIONS,
-): value is ActionBatchPayloadSchemaType {
-	return Value.Check(createActionBatchPayloadSchema(maxBatchActions), value);
+): value is ActionBatchPayload {
+	return (
+		isRecord(value) &&
+		hasOnlyKeys(value, ["actions", "batchId", "rationale", "reflection"]) &&
+		Array.isArray(value.actions) &&
+		value.actions.length >= MIN_BATCH_ACTIONS &&
+		value.actions.length <= maxBatchActions &&
+		value.actions.every(isQueueAction) &&
+		(value.batchId === undefined || isNonEmptyString(value.batchId)) &&
+		(value.rationale === undefined || typeof value.rationale === "string") &&
+		(value.reflection === undefined || isPlanReflection(value.reflection))
+	);
 }
 
-/**
- * Parse and validate an analyzer-produced batch payload.
- */
 export function parseActionBatchPayload(
 	value: unknown,
 	maxBatchActions: number = DEFAULT_MAX_BATCH_ACTIONS,
 ): ActionBatchPayload {
 	if (!isActionBatchPayload(value, maxBatchActions)) {
-		const errors = [
-			...Value.Errors(createActionBatchPayloadSchema(maxBatchActions), value),
-		];
-		const detail = errors[0]?.message ?? "invalid batch payload";
-		throw new Error(`Invalid action batch payload: ${detail}`);
+		throw new Error("Invalid action batch payload");
 	}
 
-	return {
-		actions: value.actions,
-		batchId: value.batchId,
-		rationale: value.rationale,
-		reflection: value.reflection,
-	};
+	return value;
 }
 
 export function parseActionBatchPayloadWithConfig(
@@ -72,7 +164,6 @@ export function getActionType(action: QueueAction): ActionType {
 	return action.type;
 }
 
-/** Exhaustive dispatch helper for action discriminators. */
 export function matchQueueAction<R>(
 	action: QueueAction,
 	handlers: { [K in ActionType]: (a: Extract<QueueAction, { type: K }>) => R },
@@ -93,7 +184,6 @@ export function matchQueueAction<R>(
 	}
 }
 
-/** Exhaustive dispatch helper for action execution results. */
 export function matchActionExecutionResult<R>(
 	result: ActionExecutionResult,
 	handlers: {
