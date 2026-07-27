@@ -1,9 +1,9 @@
 import * as fs from "node:fs";
-import { withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import type { ApplyDiffAction } from "../actions";
 import type { ApplyDiffActionResult } from "../results";
 import { resolveAndValidatePath } from "../capture";
 import { validateAndPrepareDiff } from "../diff-validation";
+import { withFileMutationQueue } from "../lib/file-mutation-queue";
 import type { PathSecurityConfig } from "../lib/path-security";
 
 export interface ApplyDiffExecutionContext {
