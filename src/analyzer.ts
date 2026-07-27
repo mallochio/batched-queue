@@ -77,8 +77,30 @@ async function importCompatCompleteFromDist(): Promise<CompleteImplementation> {
  *
  * Pi ships `@earendil-works/pi-ai`; Oh My Pi ships `@oh-my-pi/pi-ai`. Probing
  * both keeps one extension build working on either harness.
+ *
+ * The specifiers must stay as literals inside `import()` calls. Oh My Pi never
+ * installs these packages on disk — its loader rewrites literal import
+ * specifiers onto host-bundled copies, so `import.meta.resolve` and
+ * `require.resolve` both fail there. A computed specifier would skip the
+ * rewrite and fail the same way.
  */
-const PI_AI_SPECIFIERS = ["@earendil-works/pi-ai", "@oh-my-pi/pi-ai"];
+const PI_AI_LOADERS: ReadonlyArray<{
+	readonly specifier: string;
+	readonly load: () => Promise<unknown>;
+}> = [
+	{
+		specifier: "@earendil-works/pi-ai",
+		load: () => import("@earendil-works/pi-ai"),
+	},
+	{
+		specifier: "@oh-my-pi/pi-ai",
+		// @ts-expect-error Oh My Pi injects this host package at load time; it is
+		// deliberately absent from this package's dependencies.
+		load: () => import("@oh-my-pi/pi-ai"),
+	},
+];
+
+const PI_AI_SPECIFIERS = PI_AI_LOADERS.map(loader => loader.specifier);
 
 async function resolvePiAiEntrypointUrl(): Promise<string> {
 	const failures: string[] = [];
@@ -97,16 +119,29 @@ async function resolvePiAiEntrypointUrl(): Promise<string> {
 
 export async function resolveCompleteImplementation(): Promise<CompleteImplementation> {
 	completeImplementationPromise ??= (async () => {
-		const piAiModule = await import(await resolvePiAiEntrypointUrl());
-		if (isCompleteModule(piAiModule)) {
-			return piAiModule.complete;
+		const failures: string[] = [];
+		for (const { specifier, load } of PI_AI_LOADERS) {
+			try {
+				const piAiModule = await load();
+				if (isCompleteModule(piAiModule)) {
+					return piAiModule.complete;
+				}
+				failures.push(`${specifier}: no complete() export`);
+			} catch (error) {
+				failures.push(`${specifier}: ${(error as Error).message}`);
+			}
 		}
 
 		// Pi 0.80 moved complete() to a compat entrypoint, but some Pi loaders
 		// misresolve static subpath imports from TypeScript extensions. Import the
 		// sibling dist file by absolute URL so both old root exports and newer
 		// compat-only packages load reliably.
-		return importCompatCompleteFromDist();
+		try {
+			return await importCompatCompleteFromDist();
+		} catch (error) {
+			failures.push(`compat dist: ${(error as Error).message}`);
+		}
+		throw new Error(`cannot resolve a pi-ai host module (${failures.join("; ")})`);
 	})();
 	return completeImplementationPromise;
 }
