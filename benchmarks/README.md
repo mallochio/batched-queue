@@ -14,7 +14,8 @@ workshop-facing documents for `batch_queue`.
 | Workshop paper | Outline + readiness audit | Not submission-ready |
 
 Authoritative readiness checklist:
-[`PUBLICATION_READINESS.md`](./PUBLICATION_READINESS.md).
+[`PUBLICATION_READINESS.md`](./PUBLICATION_READINESS.md). Expanding next-step
+and moonshot ideation: [`NEXT_STEPS_IDEATION.md`](./NEXT_STEPS_IDEATION.md).
 
 ## Layout
 
@@ -22,6 +23,7 @@ Authoritative readiness checklist:
 benchmarks/
 ├── README.md                 # this index
 ├── PUBLICATION_READINESS.md  # evidence audit and submission gates
+├── NEXT_STEPS_IDEATION.md    # critical path, narrative forks, moonshots
 ├── PAPER_OUTLINE.md          # workshop / short-paper outline
 ├── RESEARCH_RUNBOOK.md       # experiment history + execution plan
 ├── harness/                  # H1–H24 controlled Pi fixture suite
@@ -52,8 +54,10 @@ Paid Terminal-Bench gates require explicit approval env vars; see
 
 1. [`PUBLICATION_READINESS.md`](./PUBLICATION_READINESS.md) — what the numbers
    can and cannot claim.
-2. [`PAPER_OUTLINE.md`](./PAPER_OUTLINE.md) — venue, RQs, table shells.
-3. [`RESEARCH_RUNBOOK.md`](./RESEARCH_RUNBOOK.md) — history, validity issues,
+2. [`NEXT_STEPS_IDEATION.md`](./NEXT_STEPS_IDEATION.md) — critical path,
+   narrative forks, and moonshot portfolio.
+3. [`PAPER_OUTLINE.md`](./PAPER_OUTLINE.md) — venue, RQs, table shells.
+4. [`RESEARCH_RUNBOOK.md`](./RESEARCH_RUNBOOK.md) — history, validity issues,
    cost-conscious gates.
-4. [`harness/README.md`](./harness/README.md) and
+5. [`harness/README.md`](./harness/README.md) and
    [`terminal-bench/README.md`](./terminal-bench/README.md) — how to reproduce.

@@ -3,6 +3,8 @@
 Status snapshot as of **23 July 2026** (`main` / docs sync). This is a decision
 document, not a paper draft. Use it to decide what to finish before submitting
 [`PAPER_OUTLINE.md`](./PAPER_OUTLINE.md). Doc index: [`README.md`](./README.md).
+For expanded next steps and moonshot ideas, see
+[`NEXT_STEPS_IDEATION.md`](./NEXT_STEPS_IDEATION.md).
 
 ## Verdict
 

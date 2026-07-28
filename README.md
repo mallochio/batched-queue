@@ -56,6 +56,7 @@ Research and publication docs live under [`benchmarks/`](./benchmarks/):
 | --- | --- |
 | [`benchmarks/README.md`](./benchmarks/README.md) | Benchmark index and current status |
 | [`benchmarks/PUBLICATION_READINESS.md`](./benchmarks/PUBLICATION_READINESS.md) | Evidence audit, claim ladder, submission gates |
+| [`benchmarks/NEXT_STEPS_IDEATION.md`](./benchmarks/NEXT_STEPS_IDEATION.md) | Critical path, narrative forks, moonshots |
 | [`benchmarks/PAPER_OUTLINE.md`](./benchmarks/PAPER_OUTLINE.md) | Workshop / short-paper outline |
 | [`benchmarks/RESEARCH_RUNBOOK.md`](./benchmarks/RESEARCH_RUNBOOK.md) | Experiment history and execution plan |
 | [`benchmarks/harness/README.md`](./benchmarks/harness/README.md) | Controlled H1–H24 protocol |
