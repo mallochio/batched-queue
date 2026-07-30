@@ -7,6 +7,7 @@ import type { ShellSessionState } from "../state";
 import {
 	evaluatePermissionAsync,
 	loadPermissions,
+	type PermissionRule,
 } from "../lib/permissions";
 
 export interface ExecuteBashExecutionContext {
@@ -14,6 +15,7 @@ export interface ExecuteBashExecutionContext {
 	readonly shellState: ShellSessionState;
 	readonly limits: OutputLimits;
 	readonly defaultTimeoutMs: number;
+	readonly permissionRules?: PermissionRule[];
 }
 
 export async function executeBashCommand(
@@ -23,10 +25,11 @@ export async function executeBashCommand(
 ): Promise<ExecuteBashActionResult> {
 	const started = Date.now();
 
+	const rules = ctx.permissionRules ?? loadPermissions();
 	const verdict = await evaluatePermissionAsync(
 		"Bash",
 		{ cmd: action.command },
-		loadPermissions(),
+		rules,
 	);
 	if (verdict.action === "reject") {
 		const message = verdict.message

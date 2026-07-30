@@ -1,23 +1,13 @@
 /**
  * Permission gate tests for execute_bash.
- *
- * Isolated in its own file because bun hoists mock.module() to file scope.
  */
 
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { PersistentShell } from "../src/persistent-shell";
 import { executeBashCommand } from "../src/executors/execute-bash";
-
-mock.module("../src/lib/permissions", () => ({
-	evaluatePermissionAsync: async () => ({
-		action: "reject",
-		message: "blocked by test rule",
-	}),
-	loadPermissions: () => [],
-}));
 
 describe("execute_bash permission gate", () => {
 	let tmpDir: string;
@@ -55,6 +45,13 @@ describe("execute_bash permission gate", () => {
 					maxLineChars: 500,
 				},
 				defaultTimeoutMs: 5_000,
+				permissionRules: [
+					{
+						tool: "Bash",
+						action: "reject",
+						message: "blocked by test rule",
+					},
+				],
 			},
 		);
 
