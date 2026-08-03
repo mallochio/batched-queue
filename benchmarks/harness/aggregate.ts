@@ -67,7 +67,7 @@ function computeCell(rows: RunSummary[]): CellStats {
 		scenario: rows[0].scenario,
 		condition: rows[0].condition,
 		n: rows.length,
-		successRate: mean(rows.map((r) => (r.verificationPassed ? 1 : 0))),
+		successRate: mean(rows.map((r) => (r.outcome === "pass" ? 1 : 0))),
 		medianTurns: median(rows.map((r) => r.modelTurns)),
 		medianToolCalls: median(rows.map((r) => r.toolCalls)),
 		medianActions: median(rows.map((r) => r.actionsCompleted)),
@@ -204,7 +204,7 @@ function renderAggregateRow(condition: string, rows: RunSummary[]): string {
 	const driverCost = median(condRows.map((r) => r.usage.costUsd));
 	const plannerCost = median(condRows.map((r) => r.plannerUsage?.costUsd ?? 0));
 	return (
-		`| ${condition} | ${pct(mean(condRows.map((r) => (r.verificationPassed ? 1 : 0))))} | ` +
+		`| ${condition} | ${pct(mean(condRows.map((r) => (r.outcome === "pass" ? 1 : 0))))} | ` +
 		`${fmt(median(condRows.map((r) => r.modelTurns)))} | ` +
 		`${fmt(median(condRows.map((r) => r.toolCalls)))} | ` +
 		`$${driverCost.toFixed(5)} | $${plannerCost.toFixed(5)} | $${(driverCost + plannerCost).toFixed(5)} | ` +

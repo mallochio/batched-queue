@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Deterministic executor benchmark (D1–D7).
+ * Deterministic executor benchmark (D1–D8).
  *
  * Compares batched (one executeBatch call) vs unbatched (one executeBatch
  * per action) execution on the same action sequences.  No API keys, no models.
@@ -10,12 +10,13 @@
  *   bun run benchmarks/deterministic/run.ts --json    # emit JSON lines too
  *
  * Acceptance criteria per DETERMINISTIC-PLAN.md:
- *   1. batched and unbatched produce equivalent expected results (D1, D7)
+ *   1. batched and unbatched produce equivalent expected results (D1, D7, D8)
  *   2. shell state persists within a batch              (D2)
  *   3. bindings resolve only after producer action      (D3)
  *   4. failed actions prevent later actions from running (D4)
  *   5. workspace / diff validation enforced             (D6)
  *   6. timeout recovery works                           (D5)
+ *   7. independent-read control baseline                (D8)
  */
 
 import { createBatchQueueRunner } from "../../src/queue-runner.ts";
@@ -412,6 +413,29 @@ const SCENARIOS: Scenario[] = [
 			];
 		},
 	},
+
+	// ── D8: independent-read control baseline ────────────────────────────
+	{
+		id: "D8",
+		label: "independent-read-control",
+		actions: [
+			{ type: "read_lines", path: "README.md", startLine: 1, endLine: 3 },
+			{ type: "read_lines", path: "src/config-loader.ts", startLine: 1, endLine: 5 },
+			{ type: "read_lines", path: "nested/state.txt", startLine: 1, endLine: 2 },
+		],
+		batchedAssert: (r) => [
+			{ name: "all-3-reads-completed", pass: r.completedCount === 3 && !r.haltedPrematurely },
+			{ name: "read-1-success", pass: r.results[0]?.type === "read_lines" && ((r.results[0] as any).lines?.length ?? 0) > 0 },
+			{ name: "read-2-success", pass: r.results[1]?.type === "read_lines" && ((r.results[1] as any).lines?.length ?? 0) > 0 },
+			{ name: "read-3-success", pass: r.results[2]?.type === "read_lines" && ((r.results[2] as any).lines?.length ?? 0) > 0 },
+		],
+		unbatchedAssert: (rs) => [
+			{ name: "all-3-read-batches-completed", pass: rs.length === 3 && rs.every((r) => !r.haltedPrematurely) },
+			{ name: "read-1-success", pass: rs[0]?.results[0]?.type === "read_lines" && ((rs[0].results[0] as any).lines?.length ?? 0) > 0 },
+			{ name: "read-2-success", pass: rs[1]?.results[0]?.type === "read_lines" && ((rs[1].results[0] as any).lines?.length ?? 0) > 0 },
+			{ name: "read-3-success", pass: rs[2]?.results[0]?.type === "read_lines" && ((rs[2].results[0] as any).lines?.length ?? 0) > 0 },
+		],
+	},
 ];
 
 // ── Statistics ─────────────────────────────────────────────────────────────────
@@ -506,7 +530,7 @@ function renderReport(
 	const lines: string[] = [];
 	const entries = [...allResults.values()];
 
-	lines.push("# Deterministic benchmark report (D1–D7)");
+	lines.push("# Deterministic benchmark report (D1–D8)");
 	lines.push("");
 	lines.push(`Run: ${new Date().toISOString().slice(0, 19).replace("T", " ")}`);
 	lines.push(`Repetitions: ${entries[0]?.batched.repCount ?? 1} per condition`);

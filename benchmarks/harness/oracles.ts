@@ -15,6 +15,8 @@ export interface ProofSpec {
 	family: string;
 	/** Substrings that must appear in the final text or any bash/batch output. */
 	expectedSubstrings?: string[];
+	/** Substrings of which at least one must appear in the final text or any bash/batch output. */
+	expectedAnySubstrings?: string[];
 	/** Bash command to re-run in the fixture directory (side-effect bounded). */
 	reverifyCommand?: string;
 	/** Expected exit code for reverifyCommand; defaults to 0. */
@@ -108,6 +110,12 @@ export async function defaultOracle(ctx: OracleContext): Promise<OracleResult> {
 		for (const sub of proof.expectedSubstrings) {
 			checks[`expected:${sub}`] = outputs.some((o) => contains(o, sub));
 		}
+	}
+
+	if (proof.expectedAnySubstrings) {
+		checks["expectedAny"] = proof.expectedAnySubstrings.some((sub) =>
+			outputs.some((o) => contains(o, sub)),
+		);
 	}
 
 	if (proof.forbiddenOutput) {
