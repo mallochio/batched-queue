@@ -6,4 +6,7 @@ benchmarks/results/
 .cache
 .venv*
 .*venv*
+__pycache__/
+*.pyc
+benchmarks/terminal-bench/requirements.txt
 
