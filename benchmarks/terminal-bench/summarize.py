@@ -48,7 +48,15 @@ def summarize_trial(result_path: Path) -> dict[str, Any]:
     outcome = "pass" if reward == 1 else "fail"
     if exception:
         kind = str(exception.get("exception_type", "invalid"))
-        outcome = "timeout" if "Timeout" in kind else "provider_error" if "Api" in kind else "invalid"
+        msg = str(exception.get("exception_message", ""))
+        if "NonZeroAgentExitCodeError" in kind:
+            outcome = "timeout" if ("exit 143" in msg or "exit 124" in msg) else ("pass" if reward == 1 else "fail")
+        elif "Timeout" in kind:
+            outcome = "timeout"
+        elif "Api" in kind:
+            outcome = "provider_error"
+        else:
+            outcome = "invalid"
     agent = result.get("agent_result") or {}
     timing = result.get("agent_execution") or {}
     return {
