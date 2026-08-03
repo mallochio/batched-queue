@@ -1,0 +1,49 @@
+{
+  "records": [
+    {
+      "kind": "trigger-snapshot",
+      "path": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-9be94eb3e08495d3/trigger-snapshot.json",
+      "chunkPaths": [
+        "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-9be94eb3e08495d3/trigger-raw-001.json",
+        "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-9be94eb3e08495d3/trigger-raw-002.json"
+      ],
+      "timestamp": "2026-07-21T22:12:41.180Z"
+    },
+    {
+      "kind": "continuation",
+      "path": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-9be94eb3e08495d3/continuation.json",
+      "timestamp": "2026-07-21T22:12:41.182Z"
+    },
+    {
+      "kind": "git-snapshot",
+      "path": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-9be94eb3e08495d3/git-snapshot.json",
+      "chunkPaths": [],
+      "timestamp": "2026-07-21T22:12:41.263Z"
+    },
+    {
+      "kind": "state-evidence",
+      "path": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-9be94eb3e08495d3/state-evidence.json",
+      "timestamp": "2026-07-21T22:12:41.277Z"
+    },
+    {
+      "kind": "prompt-metrics",
+      "path": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-9be94eb3e08495d3/prompt-metrics.json",
+      "timestamp": "2026-07-21T22:12:41.335Z"
+    },
+    {
+      "kind": "candidate",
+      "path": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-9be94eb3e08495d3/candidate-summary.md",
+      "timestamp": "2026-07-21T22:12:52.473Z"
+    },
+    {
+      "kind": "candidate",
+      "path": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-9be94eb3e08495d3/candidate-summary.md",
+      "timestamp": "2026-07-21T22:12:54.111Z"
+    },
+    {
+      "kind": "judge",
+      "path": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-9be94eb3e08495d3/judge.json",
+      "timestamp": "2026-07-21T22:12:54.112Z"
+    }
+  ]
+}

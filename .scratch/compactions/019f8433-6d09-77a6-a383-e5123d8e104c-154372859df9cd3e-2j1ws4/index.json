@@ -1,0 +1,60 @@
+{
+  "records": [
+    {
+      "kind": "trigger-snapshot",
+      "path": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-154372859df9cd3e-2j1ws4/trigger-snapshot.json",
+      "chunkPaths": [
+        "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-154372859df9cd3e-2j1ws4/trigger-raw-001.json",
+        "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-154372859df9cd3e-2j1ws4/trigger-raw-002.json",
+        "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-154372859df9cd3e-2j1ws4/trigger-raw-003.json"
+      ],
+      "timestamp": "2026-07-22T11:40:34.941Z"
+    },
+    {
+      "kind": "continuation",
+      "path": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-154372859df9cd3e-2j1ws4/continuation.json",
+      "timestamp": "2026-07-22T11:40:34.955Z"
+    },
+    {
+      "kind": "git-snapshot",
+      "path": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-154372859df9cd3e-2j1ws4/git-snapshot.json",
+      "chunkPaths": [],
+      "timestamp": "2026-07-22T11:40:35.041Z"
+    },
+    {
+      "kind": "state-evidence",
+      "path": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-154372859df9cd3e-2j1ws4/state-evidence.json",
+      "timestamp": "2026-07-22T11:40:35.042Z"
+    },
+    {
+      "kind": "prompt-metrics",
+      "path": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-154372859df9cd3e-2j1ws4/prompt-metrics.json",
+      "timestamp": "2026-07-22T11:40:35.076Z"
+    },
+    {
+      "kind": "candidate",
+      "path": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-154372859df9cd3e-2j1ws4/candidate-summary.md",
+      "timestamp": "2026-07-22T11:41:51.619Z"
+    },
+    {
+      "kind": "prompt-metrics",
+      "path": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-154372859df9cd3e-2j1ws4/prompt-metrics.json",
+      "timestamp": "2026-07-22T11:41:51.636Z"
+    },
+    {
+      "kind": "prompt-metrics",
+      "path": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-154372859df9cd3e-2j1ws4/prompt-metrics.json",
+      "timestamp": "2026-07-22T11:43:25.833Z"
+    },
+    {
+      "kind": "judge",
+      "path": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-154372859df9cd3e-2j1ws4/judge.json",
+      "timestamp": "2026-07-22T11:44:36.414Z"
+    },
+    {
+      "kind": "adoption",
+      "path": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-154372859df9cd3e-2j1ws4/adoption.json",
+      "timestamp": "2026-07-22T11:44:36.435Z"
+    }
+  ]
+}

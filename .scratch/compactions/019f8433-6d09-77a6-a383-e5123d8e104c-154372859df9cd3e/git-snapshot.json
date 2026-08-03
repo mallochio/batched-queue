@@ -1,0 +1,10 @@
+{
+  "path": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-154372859df9cd3e/git-snapshot.json",
+  "statusPath": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-154372859df9cd3e/git-status.txt",
+  "diffStatPath": "/Users/sid/Personal/other/batched-queue/.scratch/compactions/019f8433-6d09-77a6-a383-e5123d8e104c-154372859df9cd3e/git-diff-stat.txt",
+  "diffChunkPaths": [],
+  "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "diffBytes": 0,
+  "fullDiffPreserved": true,
+  "fullDiffComplete": true
+}

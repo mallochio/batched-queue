@@ -1,0 +1,9 @@
+{
+  "score": 0,
+  "decision": "reject",
+  "missing": [
+    "Candidate summary was empty or heading-only after regeneration"
+  ],
+  "contradictions": [],
+  "diagnosis": "Slipstream candidate generation returned an empty or heading-only summary twice; refusing repair because there is no substantive summary to rewrite."
+}

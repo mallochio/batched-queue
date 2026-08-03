@@ -1,0 +1,9 @@
+{
+  "records": [
+    {
+      "kind": "summary-prompt",
+      "chars": 649129,
+      "maxConversationChars": 700000
+    }
+  ]
+}

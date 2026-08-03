@@ -1,0 +1,17 @@
+{
+  "records": [
+    {
+      "kind": "summary-prompt",
+      "chars": 649129,
+      "maxConversationChars": 700000
+    },
+    {
+      "kind": "judge-prompt",
+      "chars": 175155
+    },
+    {
+      "kind": "judge-retry-prompt",
+      "chars": 141797
+    }
+  ]
+}
