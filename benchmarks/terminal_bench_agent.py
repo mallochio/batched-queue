@@ -159,11 +159,12 @@ class BatchedQueuePi(Pi):
         if not self.model_name or "/" not in self.model_name:
             raise ValueError("model must be provider/model")
         provider, model = self.model_name.split("/", 1)
+        formatted_instruction = instruction if not instruction.startswith("-") else f"\n{instruction}"
         command = (
             ". ~/.nvm/nvm.sh; "
             "pi --print --mode json "
             f"--provider {shlex.quote(provider)} --model {shlex.quote(model)} "
-            f"{self.build_cli_flags()} -- {shlex.quote(instruction)} "
+            f"{self.build_cli_flags()} {shlex.quote(formatted_instruction)} "
             "2>&1 </dev/null | grep -v '\"type\":\"message_update\"' | "
             f"stdbuf -oL tee /logs/agent/{self._OUTPUT_FILENAME}"
         )
