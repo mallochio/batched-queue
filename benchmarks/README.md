@@ -7,7 +7,7 @@ workshop-facing documents for `batch_queue`.
 
 | Track | Status | Cite as |
 | --- | --- | --- |
-| Deterministic executor (D1–D7) | Runnable, model-free | Mechanism / appendix |
+| Deterministic executor (D1–D8) | Runnable, model-free | Mechanism / appendix |
 | Controlled fixtures (H1–H24) | Directional; Phase 2 aggregates unrepaired | Mechanism only until repaired |
 | Terminal-Bench 2.1 pilot | Complete (3×2) | Harness validation |
 | Terminal-Bench 2.1 full paired run | **45 / 89 pairs** interim | Incomplete — not a full external result |

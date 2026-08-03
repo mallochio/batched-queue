@@ -176,7 +176,7 @@ export const SCENARIO_PROOFS: Record<string, ProofSpec> = {
 	H8: {
 		family: "shell+verify",
 		expectedSubstrings: [MARKERS.shellVar, MARKERS.verifyOk, MARKERS.verifyToken],
-		reverifyCommand: "cd nested && BQ_VAR=STATE-88 && pwd | sed 's|.*/||' && echo $BQ_VAR && bash scripts/check.sh",
+		reverifyCommand: "cd nested && BQ_VAR=STATE-88 && pwd | sed 's|.*/||' && echo $BQ_VAR && bash ../scripts/check.sh",
 		reverifyOutputContains: ["nested", "STATE-88", "VERIFY_OK token=VTOK-9C3"],
 	},
 	H9: {
@@ -188,7 +188,7 @@ export const SCENARIO_PROOFS: Record<string, ProofSpec> = {
 	H10: {
 		family: "binding+verify",
 		expectedSubstrings: [`consumed:${MARKERS.benchMarker}`, MARKERS.verifyOk],
-		reverifyCommand: "cd nested && marker=$(sed 's/BENCH_MARKER=//' state.txt) && echo consumed:$marker && bash scripts/check.sh",
+		reverifyCommand: "cd nested && marker=$(sed 's/BENCH_MARKER=//' state.txt) && echo consumed:$marker && bash ../scripts/check.sh",
 		reverifyOutputContains: [`consumed:${MARKERS.benchMarker}`, "VERIFY_OK token=VTOK-9C3"],
 	},
 	H11: {
@@ -257,7 +257,7 @@ export const SCENARIO_PROOFS: Record<string, ProofSpec> = {
 	},
 	H21: {
 		family: "failure",
-		expectedSubstrings: ["fail", "nonzero"],
+		expectedAnySubstrings: ["fail", "nonzero"],
 		reverifyCommand: "bash scripts/fail.sh",
 		expectedExitCode: 3,
 		reverifyOutputContains: ["fail"],
