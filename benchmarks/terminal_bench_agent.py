@@ -163,7 +163,7 @@ class BatchedQueuePi(Pi):
             ". ~/.nvm/nvm.sh; "
             "pi --print --mode json "
             f"--provider {shlex.quote(provider)} --model {shlex.quote(model)} "
-            f"{self.build_cli_flags()} {shlex.quote(instruction)} "
+            f"{self.build_cli_flags()} -- {shlex.quote(instruction)} "
             "2>&1 </dev/null | grep -v '\"type\":\"message_update\"' | "
             f"stdbuf -oL tee /logs/agent/{self._OUTPUT_FILENAME}"
         )
