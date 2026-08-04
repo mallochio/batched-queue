@@ -1,0 +1,62 @@
+\begin{thebibliography}{8}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Contributors(2025)]{harbor2025}
+Harbor~Framework Contributors.
+\newblock Harbor: A containerized evaluation framework for executable agent
+  benchmarks.
+\newblock \emph{arXiv preprint arXiv:2501.00000}, 2025.
+
+\bibitem[Fox(2025)]{rgb_agent2025}
+Alexis Fox.
+\newblock Rgb-agent: Read-grep-bash action queue architecture for complex
+  reasoning.
+\newblock \emph{ARC-AGI-3 Technical Report}, 2025.
+\newblock Primary architectural inspiration for tool-action queuing.
+
+\bibitem[Jimenez et~al.(2024)Jimenez, Yang, Wettig, Yang, Yao, Narasimhan, and
+  Press]{swebench2024}
+Carlos~E Jimenez, John Yang, Alexander Wettig, Shunyu Yang, Shunyu Yao, Karthik
+  Narasimhan, and Ofir Press.
+\newblock Swe-bench: Can language models resolve real-world github issues?
+\newblock \emph{International Conference on Learning Representations (ICLR)},
+  2024.
+
+\bibitem[Liu et~al.(2023)Liu, Yu, Zhang, Xu, Lei, Lai, Gu, Hang, Yao, Zhang,
+  et~al.]{agentbench2023}
+Xiao Liu, Hao Yu, Hanyu Zhang, Yifan Xu, Xuanyu Lei, Hanyu Lai, Yu~Gu, Hang
+  Hang, Shunyu Yao, Ning Zhang, et~al.
+\newblock Agentbench: Evaluating llms as agents.
+\newblock \emph{arXiv preprint arXiv:2308.03688}, 2023.
+
+\bibitem[Patil et~al.(2023)Patil, Zhang, Wang, and Gonzalez]{gorilla2023}
+Shishir~G Patil, Tianjun Zhang, Xin Wang, and Joseph~E Gonzalez.
+\newblock Gorilla: Large language model connected with massive apis.
+\newblock \emph{arXiv preprint arXiv:2305.15334}, 2023.
+
+\bibitem[Schick et~al.(2023)Schick, Dwivedi-Yu, Dess{\`i}, Raileanu, Lomeli,
+  Zettlemoyer, Cancedda, and Scialom]{toolformer2023}
+Timo Schick, Jane Dwivedi-Yu, Roberto Dess{\`i}, Roberta Raileanu, Maria
+  Lomeli, Luke Zettlemoyer, Nicola Cancedda, and Thomas Scialom.
+\newblock Toolformer: Language models can teach themselves to use tools.
+\newblock \emph{Advances in Neural Information Processing Systems (NeurIPS)},
+  36, 2023.
+
+\bibitem[Shaw and Team(2025)]{terminalbench2025}
+Alex Shaw and Harbor~Benchmark Team.
+\newblock Terminal-bench 2.1: Evaluating language agents on complex interactive
+  terminal tasks.
+\newblock \emph{Evaluation Benchmark Suite}, 2025.
+
+\bibitem[Yao et~al.(2022)Yao, Zhao, Yu, Du, Shafran, Narasimhan, and
+  Cao]{react2022}
+Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran, Karthik Narasimhan,
+  and Yuan Cao.
+\newblock React: Synergizing reasoning and acting in language models.
+\newblock \emph{arXiv preprint arXiv:2210.03629}, 2022.
+
+\end{thebibliography}

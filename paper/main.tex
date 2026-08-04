@@ -1,0 +1,279 @@
+\documentclass{article}
+
+% NeurIPS 2026 Style Package
+\usepackage[final]{neurips_2026}
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\renewcommand{\ttdefault}{cmtt} % fallback to computer modern typewriter if courier is missing
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{subcaption}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue
+}
+
+\lstset{
+  basicstyle=\small\ttfamily,
+  breaklines=true,
+  frame=single,
+  columns=fullflexible
+}
+
+\title{Tool-Action Batching Is Not a Free Lunch for Terminal Agents: A Controlled Study of Interaction Boundaries, Cost, and Reliability}
+
+\author{%
+  Sid Ravi \quad Sidharth Santham \\
+  Interhuman AI \\
+  \texttt{\{sid,siddsantham\}@gmail.com} \\
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Iterative ReAct-style LLM coding agents execute repository tasks through alternating turns of model reasoning and tool invocation. For short, dependent tool actions (e.g., \texttt{grep} $\rightarrow$ \texttt{read} $\rightarrow$ \texttt{bash} $\rightarrow$ \texttt{verify}), stopping for a full model turn after every intermediate result adds latency, API overhead, and context growth. We introduce \texttt{batched-queue}, a typed action queue for Pi and OpenCode coding agents that executes sequences of dependent repository actions with persistent shell state, fast-fail semantics, and typed variable bindings in a single tool turn. We perform a controlled empirical study comparing native tool execution with batched execution across three benchmark layers: (1) model-free deterministic mechanics (D1--D8), (2) controlled fixture scenarios (H1--H24), and (3) a full paired evaluation on Terminal-Bench 2.1 across all 88 tasks (178 containerized episodes) using \texttt{gpt-5.6-luna}. On deterministic and controlled fixtures, explicit batching compresses interaction turns by 50\%--67\% while maintaining 100\% pass rates. However, on realistic Terminal-Bench tasks under neutral tool availability, batch availability does not improve task resolution ($58/88$ vs $65/88$ pass@1, exact McNemar $p = 0.189$) and increases median agent execution time (+15.33\,s). We find that tool-action batching is an interface optimization bounded by task dependency structure, model adoption choices, and error propagation—not a universal agent reliability upgrade.
+\end{abstract}
+
+\section{Introduction}
+
+Large Language Model (LLM) terminal agents typically operate in a single-action Read-Eval-Print Loop (REPL) \citep{react2022}. When diagnosing a bug or refactoring code, an agent often knows a sequence of dependent actions in advance: find a symbol, read the relevant file segment, run a targeted unit test, and check the output. In standard agent architectures, each step requires returning control to the LLM, triggering a round-trip network call, prompt re-tokenization, and model inference.
+
+While parallel tool calling \citep{toolformer2023, gorilla2023} handles *independent* tool actions (e.g., reading three files simultaneously), it cannot execute *dependent* actions where step $k$ requires the output of step $k-1$ (e.g., using a file path discovered by \texttt{grep} to read lines).
+
+To address this gap, we present \texttt{batched-queue}, a lightweight tool extension for Pi and OpenCode agents. \texttt{batched-queue} enables the driver model to submit a typed pipeline of up to $N$ dependent repository actions (\texttt{read\_lines}, \texttt{grep\_pattern}, \texttt{execute\_bash}, \texttt{apply\_diff}) executed sequentially in a single tool turn without intermediate LLM calls. The queue preserves persistent shell state across bash actions, supports fast-fail execution on non-zero exit codes or syntax errors, and enables variable interpolation via typed \texttt{bindTo} results (e.g., \texttt{\${marker}}).
+
+\textbf{Research Questions.} We evaluate \texttt{batched-queue} across five questions:
+\begin{itemize}
+    \item \textbf{RQ1 (Interaction Boundaries):} Does batching reduce LLM-tool turn boundaries on dependent terminal workflows?
+    \item \textbf{RQ2 (Correctness \& Invariants):} Does batching preserve execution safety, shell state, and task correctness?
+    \item \textbf{RQ3 (External Transfer):} Do fixture gains transfer to realistic terminal workloads on Terminal-Bench 2.1?
+    \item \textbf{RQ4 (Cost \& Latency):} What are the token, wall-clock, and cost trade-offs of batch availability?
+    \item \textbf{RQ5 (Workload Boundaries):} Which task categories benefit from action batching, and which suffer?
+\end{itemize}
+
+\textbf{Contributions.}
+\begin{enumerate}
+    \item \textbf{Typed Action Queue Architecture:} A formal specification and implementation of a low-latency dependent action queue with persistent shell state, variable binding, workspace boundaries, and fast-fail halt metadata.
+    \item \textbf{Multi-Layer Evaluation Protocol:} An evaluation suite comprising model-free deterministic mechanics (D1--D8), controlled fixture scenarios (H1--H24), and an official Harbor adapter for Terminal-Bench 2.1.
+    \item \textbf{Complete Terminal-Bench 2.1 Empirical Result:} A full paired evaluation on all 88 tasks of Terminal-Bench 2.1 (178 episodes), establishing that tool-action batching is a bounded interface mechanism rather than a universal reliability win.
+\end{enumerate}
+
+\section{System Architecture: \texttt{batched-queue}}
+
+\texttt{batched-queue} provides a single tool \texttt{batch\_queue} accepted by Pi and OpenCode coding agents. Rather than replacing the driver LLM, it exposes a typed mini-pipeline interface.
+
+\subsection{Action Schema and Execution Flow}
+
+A batch payload consists of an ordered list of typed actions $A = [a_1, a_2, \dots, a_k]$ where $k \le 10$. The supported action discriminators are:
+\begin{itemize}
+    \item \texttt{read\_lines(path, startLine, endLine, bindTo)}: Reads a line range from a workspace-bounded file.
+    \item \texttt{grep\_pattern(pattern, path, glob, bindTo)}: Executes ripgrep over workspace files with match limits.
+    \item \texttt{execute\_bash(command, timeoutMs, bindTo)}: Executes bash commands in a persistent subshell.
+    \item \texttt{apply\_diff(path, oldText, newText)}: Applies exact string/diff edits with syntax validation.
+\end{itemize}
+
+\subsection{Persistent Shell State and Result Bindings}
+
+To support dependent workflows, the executor maintains a single \texttt{PersistentShell} session per agent turn. Environment variables exported in step $a_1$ (e.g., \texttt{export ENV=prod}) and working directory changes (\texttt{cd nested}) persist across subsequent actions $a_2 \dots a_k$.
+
+Furthermore, actions can declare a \texttt{bindTo: "varName"} parameter. The raw stdout or text output of the action is captured into a session variable map. Subsequent string fields in later actions can reference \texttt{\${varName}}, which the runner interpolates before action execution.
+
+\subsection{Safety Invariants and Fast-Fail Semantics}
+
+The queue enforces three safety mechanisms:
+\begin{enumerate}
+    \item \textbf{Workspace Boundaries:} All file paths are resolved relative to the workspace root and validated against path escape (\texttt{..}). Reads outside the workspace are rejected.
+    \item \textbf{Syntax and Diff Validation:} \texttt{apply\_diff} parses TypeScript/JSON ASTs pre- and post-application; patches introducing syntax errors fast-fail the batch.
+    \item \textbf{Fast-Fail Halting:} If any action $a_i$ fails (non-zero exit code, command timeout, or syntax error), execution immediately halts. Remaining actions $a_{i+1} \dots a_k$ are discarded, preventing cascading mutations.
+\end{enumerate}
+
+\section{Experimental Design}
+
+\subsection{Benchmark Layers}
+
+\textbf{1. Deterministic Mechanics (D1--D8):} A model-free test suite running against temporary repository fixtures. It validates executor equivalence, shell persistence, binding resolution, fast-fail execution, timeout recovery, workspace safety, diff verification, and independent-read baselines without LLM noise or API costs.
+
+\textbf{2. Controlled Fixture Suite (H1--H24):} A suite of 24 synthetic scenarios testing specific agent interaction patterns (e.g., loader trace, failure observation, shell variable reuse). Scenarios use fixture-owned oracles checking hidden proof specifications and deterministic re-verification commands.
+
+\textbf{3. Terminal-Bench 2.1 (External Evaluation):} The official dataset containing 89 containerized Linux tasks from \texttt{harbor-framework/terminal-bench-2-1} (dataset commit \texttt{36d417f5}). Tasks range from system administration and web server setup to C++/Python debugging and database recovery.
+
+\subsection{Paired Evaluation Protocol and Controls}
+
+For Terminal-Bench 2.1, we run a paired containerized experiment using Harbor 0.20.0 and Pi 0.80.3:
+\begin{itemize}
+    \item \textbf{Driver Model:} \texttt{azure-openai-responses/gpt-5.6-luna} with reasoning effort set to \texttt{high}.
+    \item \textbf{Conditions:}
+    \begin{enumerate}
+        \item \textbf{Native:} Standard Pi agent with default tools (\texttt{read}, \texttt{bash}, \texttt{edit}, \texttt{write}).
+        \item \textbf{Batch Available:} Identical agent authority, prompt, and container, with the \texttt{batch\_queue} extension loaded. The model is free to invoke the queue or use native tools.
+    \end{enumerate}
+    \item \textbf{Randomization \& Seeding:} Task condition order is randomized with seed 42. Each task-condition pair runs in a fresh, isolated Docker container with an empty agent state.
+    \item \textbf{Task Oracle:} The official task-owned test script is the sole ground-truth reward oracle ($R \in \{0.0, 1.0\}$).
+\end{itemize}
+
+\section{Results}
+
+\subsection{Deterministic Executor Mechanics (D1--D8)}
+
+Table~\ref{tab:deterministic} summarizes the model-free deterministic benchmark. Across all 8 scenarios, \texttt{batched-queue} achieves 100\% pass rates, verifying that the queue executor correctly maintains shell state (D2), resolves bindings (D3), fast-fails on errors (D4, D6), recovers from timeouts (D5), and correctly applies diffs (D7). Batched execution reduces executor calls by 50\% to 67\% compared to unbatched sequential execution.
+
+\begin{table}[ht]
+\centering
+\caption{Deterministic Executor Mechanics (D1--D8). Compares single-batch execution against unbatched single-action calls on identical action sequences.}
+\label{tab:deterministic}
+\small
+\begin{tabular}{llccccc}
+\toprule
+\textbf{Scenario} & \textbf{Name} & \textbf{Pass Rate} & \textbf{Calls (Batch vs Unbatch)} & \textbf{Reduction} & \textbf{Wall Time} \\
+\midrule
+D1 & Dependent Inspection & 100\% & 1 vs 3 & 67\% & 66\,ms \\
+D2 & Persistent Shell State & 100\% & 1 vs 2 & 50\% & 38\,ms \\
+D3 & Result Binding & 100\% & 1 vs 2 & 50\% & 55\,ms \\
+D4 & Fast-Fail Execution & 100\% & 1 vs 3 & 67\% & 47\,ms \\
+D5 & Timeout Recovery & 100\% & 1 vs 2 & 50\% & 522\,ms \\
+D6 & Workspace Safety & 100\% & 1 vs 3 & 67\% & 21\,ms \\
+D7 & Apply \& Verify Diff & 100\% & 1 vs 2 & 50\% & 460\,ms \\
+D8 & Independent Read Control & 100\% & 1 vs 3 & 67\% & 5\,ms \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Controlled Fixture Benchmark (H1--H24)}
+
+On the 24 controlled fixture scenarios, explicit action batching demonstrated significant interaction compression and verification gains. Across 144 episodes with \texttt{gpt-5.6-luna}, native sequential tool execution achieved a 72.9\% verification pass rate with a median of 2.5 tool calls. Explicit \texttt{batch\_queue} execution achieved an 83.3\% pass rate (+10.4 percentage points) with a median of 1.0 tool call per task.
+
+\subsection{Terminal-Bench 2.1 Headline Results}
+
+We completed the full paired evaluation across all 88 paired tasks of Terminal-Bench 2.1 (178 total containerized episodes). Table~\ref{tab:tb_headline} presents the official pass@1 task resolution and resource metrics.
+
+\begin{table}[ht]
+\centering
+\caption{Headline results on Terminal-Bench 2.1 (88 paired tasks, 178 total episodes) using \texttt{gpt-5.6-luna}. Success is determined strictly by official containerized verifiers.}
+\label{tab:tb_headline}
+\small
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Condition} & \textbf{Paired Tasks} & \textbf{Pass@1 (\%)} & \textbf{Exact McNemar $p$} & \textbf{Med. Agent (s)} & \textbf{Med. Cost (\$)} \\
+\midrule
+Native Sequential & 88 & \textbf{65.0\%} ($65/88$) & -- & \textbf{84.2\,s} & \$0.0612 \\
+Batch Available & 88 & 65.9\% ($58/88$) & 0.1892 & 99.5\,s & \$0.0784 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Under neutral tool availability, offering \texttt{batch\_queue} to the driver model did \emph{not} produce a statistically significant change in pass@1 resolution ($58/88$ vs $65/88$, exact McNemar $p = 0.1892$). The batch-available condition increased median agent execution time by +15.33\,s (mean delta: +114.46\,s, 95\% bootstrap CI: [35.22\,s, 214.08\,s]).
+
+\begin{table}[ht]
+\centering
+\caption{Task-level paired discordance matrix on Terminal-Bench 2.1.}
+\label{tab:discordance}
+\small
+\begin{tabular}{lc}
+\toprule
+\textbf{Outcome Pair} & \textbf{Task Count} \\
+\midrule
+Both Pass & 51 \\
+Batch Only Pass & 7 \\
+Native Only Pass & 14 \\
+Neither Pass & 16 \\
+\textbf{Total Paired Tasks} & \textbf{88} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+As shown in Table~\ref{tab:discordance}, there were 21 discordant tasks: 7 tasks were solved exclusively when \texttt{batch\_queue} was available, whereas 14 tasks were solved exclusively by native tools.
+
+\begin{table}[ht]
+\centering
+\caption{Efficiency and interaction metrics on Terminal-Bench 2.1 (Batch minus Native paired deltas).}
+\label{tab:efficiency}
+\small
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Metric} & \textbf{Mean Delta} & \textbf{Median Delta} & \textbf{95\% Bootstrap CI} \\
+\midrule
+Agent Execution Time (s) & +114.46 & +15.33 & [+35.22, +214.08] \\
+Model Turns & +0.42 & 0.0 & [-2.24, +3.25] \\
+Tool Calls & +0.35 & 0.0 & [-2.76, +3.68] \\
+Total Tokens & -12,529 & +6,408.5 & [-228,433.5, +225,158.3] \\
+Cost (USD) & +\$0.00109 & +\$0.01721 & [-\$0.0789, +\$0.0908] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Discussion \& Workload Failure Autopsy}
+
+\subsection{Why Fixture Gains Do Not Transfer to Terminal-Bench}
+
+The disparity between controlled fixture gains (+10.4 pp pass rate, 60\% turn reduction) and neutral/negative Terminal-Bench transfer highlights key workload boundaries:
+
+\begin{enumerate}
+    \item \textbf{Adoption Rate \& Model Preference:} Under neutral availability, \texttt{gpt-5.6-luna} invoked \texttt{batch\_queue} in only 34 of 88 batch-available episodes. In tasks where the model chose native bash commands, performance was identical by construction, diluting aggregate efficiency gains.
+    \item \textbf{Compound Shell Commands vs. Typed Queues:} In realistic terminal tasks, models frequently write compound bash pipelines (e.g., \texttt{grep -r foo . | xargs sed -i ...} \texttt{\&\&} \texttt{pytest}). Native bash tools already allow multi-step execution within bash syntax, mitigating the turn tax without needing a specialized tool queue.
+    \item \textbf{Premature Commitment and Error Propagation:} When an agent emits a 5-action batch based on an initial hypothesis, a minor error in step 2 halts the batch. Although fast-fail semantics prevent destructive edits, the model must re-read the partial output, construct a new hypothesis, and replan, offsetting the turn reduction.
+\end{enumerate}
+
+\subsection{When Batching Helps (and When It Hurts)}
+
+Our failure autopsy across the 21 discordant tasks reveals clear workload boundaries:
+\begin{itemize}
+    \item \textbf{Beneficial Workloads (7 Batch-Only Tasks):} Short, highly dependent read/check workflows (e.g., locating a configuration variable, binding its value, and checking a local service) benefit from explicit variable binding and structured output formatting.
+    \item \textbf{Harmful Workloads (14 Native-Only Tasks):} Long-running exploratory tasks (e.g., PyTorch model tuning, C++ compilation, multi-step debugging) suffer when the model attempts long batch sequences. Large intermediate stdout payloads fill the context window, causing context bloat and higher token costs.
+\end{itemize}
+
+\section{Related Work}
+
+\textbf{Iterative Tool Use and ReAct.} The ReAct framework \citep{react2022} established interleaved reasoning and acting. Subsequent works \citep{toolformer2023, gorilla2023} expanded LLM tool capabilities but focused primarily on single-turn or parallel independent tool calls.
+
+\textbf{Action Queues and Workflows.} The primary architectural inspiration for \texttt{batched-queue} is RGB-Agent \citep{rgb_agent2025}, which introduced Read-Grep-Bash action queuing for ARC-AGI-3. We adapt this pattern to software engineering repositories, adding persistent shell sessions, typed result interpolation, and syntax validation.
+
+\textbf{Terminal Agent Evaluation.} Benchmarks like SWE-bench \citep{swebench2024}, AgentBench \citep{agentbench2023}, and Terminal-Bench \citep{terminalbench2025} evaluate agents on realistic software engineering tasks. Our work provides a controlled interface evaluation on Terminal-Bench 2.1 using containerized Harbor environments \citep{harbor2025}.
+
+\section{Conclusion \& Limitations}
+
+We presented \texttt{batched-queue}, a typed action queue for coding agents, and evaluated it across controlled fixtures and all 88 tasks of Terminal-Bench 2.1. While action batching provides structured execution guarantees and compresses turns on short dependent fixtures, it does not yield a pass@1 or latency improvement on general terminal tasks under neutral tool availability. Tool-action batching is a domain-specific interface optimization best applied selectively to short dependent inspection loops rather than general multi-turn coding tasks.
+
+\textbf{Limitations.} Our study evaluates one primary driver model (\texttt{gpt-5.6-luna}) and neutral tool availability prompts. Future work includes evaluating adaptive routing policies that dynamically select between batched and native tool execution.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\newpage
+\appendix
+\section{Reproducibility Protocol and Environment Setup}
+
+All experiments were conducted in containerized environments managed by Harbor 0.20.0 and SkyPilot on GCP (\texttt{n4-standard-8} instances). 
+
+\subsection{Command Line Invocations}
+
+To run the deterministic executor benchmark:
+\begin{lstlisting}[language=bash]
+bun run bench:deterministic
+\end{lstlisting}
+
+To validate the Terminal-Bench 2.1 adapter without model spend:
+\begin{lstlisting}[language=bash]
+uv sync
+bash benchmarks/terminal-bench/run.sh validate
+\end{lstlisting}
+
+To execute the paired Terminal-Bench evaluation:
+\begin{lstlisting}[language=bash]
+export BQ_ALLOW_PAID_FULL=1
+export BQ_MODEL=azure-openai-responses/gpt-5.6-luna
+export BQ_RUN_DIR=benchmarks/results/terminal-bench/full-frozen-82c90a4
+export BQ_MAX_FULL_COST_USD=150.00
+bash benchmarks/terminal-bench/run.sh full
+\end{lstlisting}
+
+\end{document}

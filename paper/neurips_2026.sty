@@ -1,0 +1,120 @@
+% NeurIPS 2026 style file
+%
+% Adapted from NeurIPS official style files.
+%
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{neurips_2026}[2026/01/01 NeurIPS 2026 Paper Style]
+
+\DeclareOption{final}{
+  \renewcommand{\neurips@finalcopy}{1}
+}
+\DeclareOption{nonatbib}{
+  \renewcommand{\neurips@natbib}{0}
+}
+\DeclareOption{preload}{
+  \renewcommand{\neurips@preload}{1}
+}
+
+\newcommand{\neurips@finalcopy}{0}
+\newcommand{\neurips@natbib}{1}
+\newcommand{\neurips@preload}{0}
+\ProcessOptions\relax
+
+\RequirePackage{geometry}
+\geometry{
+  letterpaper,
+  text={6.5in,9.0in},
+  headheight=13pt,
+  headsep=0.25in,
+  footskip=0.375in,
+  top=1.0in,
+  left=1.0in
+}
+
+% Fonts
+\RequirePackage{times}
+
+% Paragraph formatting
+\setlength{\parindent}{1.5em}
+\setlength{\parskip}{0.0pt}
+
+% Title / Author formatting
+\newcommand{\neurips@title}{When Does Tool-Action Batching Help Terminal Agents?}
+\newcommand{\neurips@author}{}
+
+\if1\neurips@natbib
+  \RequirePackage[numbers,compress,square]{natbib}
+\fi
+
+\if1\neurips@finalcopy
+  \newcommand{\@neuripsordinal}{39th}
+  \newcommand{\@neuripsyear}{2026}
+  \newcommand{\@neuripslocation}{Vancouver, Canada}
+  \newcommand{\@neuripsnotice}{Preprint. Under review for NeurIPS 2026 Workshop.}
+\else
+  \newcommand{\@neuripsnotice}{Submitted to NeurIPS 2026 Workshop on Agent Verification and Evaluation. Do not distribute.}
+\fi
+
+\newcommand{\maketitlehead}{
+  \par
+  \begingroup
+    \renewcommand{\thefootnote}{\fnsymbol{footnote}}
+    \renewcommand{\@makefnmark}{\hbox to\z@{$^{\@thefnmark}$\hss}}
+    \long\def\@makefntext##1{\parindent 1em\noindent
+            \hb@xt@1.8em{\hss\@textsuperscript{\normalfont\@thefnmark}}##1}
+    \if@twocolumn
+      \ifnum \col@number=\@ne
+        \@maketitle
+      \else
+        \twocolumn[\@maketitle]
+      \fi
+    \else
+      \newpage
+      \global\@topnum\z@
+      \@maketitle
+    \fi
+    \thispagestyle{titlepage}\@thanks
+  \endgroup
+  \setcounter{footnote}{0}%
+}
+
+\def\@maketitle{
+  \vbox to \z@{\vss}
+  \vspace*{-0.2in}
+  \begin{center}
+    {\LARGE\bf \@title \par}
+    \vspace{0.2in}
+    \if1\neurips@finalcopy
+      {\def\and{\quad\quad}\def\AND{\par\vspace{0.1in}}
+       \large \@author \par}
+    \else
+      {\large Anonymous Authors \par
+       \vspace{0.05in}
+       \small Anonymous Institution / Affiliation \par}
+    \fi
+  \end{center}
+  \vspace{0.2in}
+}
+
+\def\ps@titlepage{%
+  \def\@oddhead{}%
+  \def\@evenhead{}%
+  \def\@oddfoot{\hfil\small\@neuripsnotice\hfil}%
+  \def\@evenfoot{\@oddfoot}%
+}
+
+\pagestyle{plain}
+
+% Abstract
+\renewenvironment{abstract}{%
+  \vspace{-0.05in}%
+  \begin{center}%
+    {\bfseries Abstract \par}%
+  \end{center}%
+  \quotation \small%
+}{%
+  \endquotation%
+  \vspace{0.1in}%
+}
+
+\endinput
