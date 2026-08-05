@@ -297,8 +297,59 @@ PY
     done < "$run_dir/plan.txt"
     "$PYTHON" benchmarks/terminal-bench/summarize.py "$run_dir" | tee "$run_dir/summary.json"
     ;;
+  adaptive-tri)
+    # Unified internally-consistent run: native + batch + adaptive for every task,
+    # all under a single BQ_MODEL, so the three conditions are directly comparable.
+    if [[ ${BQ_ALLOW_PAID_FULL:-0} != 1 || ${BQ_ALLOW_PAID_ADAPTIVE:-0} != 1 ]]; then
+      echo 'Refusing paid adaptive-tri run: set BQ_ALLOW_PAID_FULL=1 and BQ_ALLOW_PAID_ADAPTIVE=1 after approval.' >&2
+      exit 2
+    fi
+    : "${BQ_MODEL:?Set BQ_MODEL to provider/model}"
+    : "${BQ_THINKING:=high}"
+    : "${BQ_MAX_MODE_ROUTER_COST_USD:=200.00}"
+    : "${BQ_CLASSIFIER_ARTIFACT:=benchmarks/mode_router/artifacts/classifier_v1}"
+    if [[ -n $(git status --porcelain) ]]; then
+      echo 'Refusing adaptive-tri run from a dirty tree; commit the frozen harness first.' >&2
+      exit 2
+    fi
+    checkout=$(dataset_checkout)
+    run_dir=${BQ_RUN_DIR:-"benchmarks/results/terminal-bench/adaptive-tri-$(date -u +%Y%m%dT%H%M%SZ)"}
+    mkdir -p "$run_dir"
+    if [[ ! -f "$run_dir/plan.txt" ]]; then
+      all_tasks=()
+      while IFS= read -r task; do all_tasks+=("$task"); done < <(
+        find "$checkout/tasks" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort
+      )
+      make_plan "${all_tasks[@]}" > "$run_dir/plan.txt"
+    fi
+    while read -r task _ _; do
+      for cond in native batch adaptive; do
+        job="$task-$cond"
+        [[ -f "$run_dir/$job/result.json" ]] && continue
+        spent=$("$PYTHON" benchmarks/terminal-bench/summarize.py "$run_dir" --cost-only)
+        "$PYTHON" - "$spent" "$BQ_MAX_MODE_ROUTER_COST_USD" <<'PY'
+import sys
+if float(sys.argv[1]) >= float(sys.argv[2]):
+    raise SystemExit(f"adaptive-tri cost gate reached: ${float(sys.argv[1]):.4f} >= ${float(sys.argv[2]):.2f}")
+PY
+        if [[ "$cond" == "adaptive" ]]; then
+          "$HARBOR" run "${common[@]}" --include-task-name "$task" \
+            --model "$BQ_MODEL" --ak "policy_strategy=classifier" \
+            --ak "policy_artifact=$BQ_CLASSIFIER_ARTIFACT" \
+            --ak "condition=native" --ak "thinking=$BQ_THINKING" \
+            --job-name "$job" --jobs-dir "$run_dir"
+        else
+          "$HARBOR" run "${common[@]}" --include-task-name "$task" \
+            --model "$BQ_MODEL" --ak "condition=$cond" --ak "thinking=$BQ_THINKING" \
+            --job-name "$job" --jobs-dir "$run_dir"
+        fi
+        require_valid_job "$run_dir/$job"
+      done
+    done < "$run_dir/plan.txt"
+    "$PYTHON" benchmarks/terminal-bench/summarize.py "$run_dir" | tee "$run_dir/summary.json"
+    ;;
   *)
-    echo "Usage: $0 [validate|install-check|smoke|pilot|full|adaptive|adaptive-full|summarize <dir>]" >&2
+    echo "Usage: $0 [validate|install-check|smoke|pilot|full|adaptive|adaptive-full|adaptive-tri|summarize <dir>]" >&2
     exit 2
     ;;
 esac
