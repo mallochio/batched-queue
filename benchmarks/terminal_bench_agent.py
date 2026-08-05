@@ -82,7 +82,10 @@ class BatchedQueuePi(Pi):
     @override
     async def install(self, environment: BaseEnvironment) -> None:
         await super().install(environment)
-        if self.condition == "native":
+        # The batch queue extension is needed whenever this episode may run in
+        # batch mode: explicitly (condition=batch) or via a routing policy that
+        # can select batch as the effective condition.
+        if self.condition == "native" and self.policy_strategy == "static":
             return
 
         files = self._extension_files()
