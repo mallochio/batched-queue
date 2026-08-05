@@ -9,5 +9,6 @@ benchmarks/results/
 __pycache__/
 *.pyc
 *.pkl
+.DS_Store
 benchmarks/terminal-bench/requirements.txt
 
