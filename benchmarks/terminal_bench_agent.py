@@ -16,6 +16,8 @@ from harbor.agents.installed.pi import Pi
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 
+from benchmarks.mode_router.policy import ModePolicy
+
 PI_VERSION = "0.80.3"
 BUN_VERSION = "1.3.14"
 EXTENSION_DIR = "/tmp/batched-queue-extension"
@@ -39,11 +41,16 @@ class BatchedQueuePi(Pi):
         self,
         *args,
         condition: str = "native",
+        policy_strategy: str = "static",
+        policy_artifact: str | None = None,
         extension_root: str | None = None,
         **kwargs,
     ) -> None:
-        condition_flags(condition)  # validate before creating the agent
+        if policy_strategy == "static":
+            condition_flags(condition)  # validate before creating the agent
         self.condition = condition
+        self.policy_strategy = policy_strategy
+        self.policy_artifact = policy_artifact
         self.extension_root = Path(extension_root or Path(__file__).parents[1]).resolve()
         super().__init__(*args, version=PI_VERSION, **kwargs)
 
@@ -158,13 +165,31 @@ class BatchedQueuePi(Pi):
             raise RuntimeError("verifier files are visible before agent execution")
         if not self.model_name or "/" not in self.model_name:
             raise ValueError("model must be provider/model")
+
+        task_id = getattr(context, "task_id", None) or getattr(getattr(context, "task", None), "id", "unknown")
+        
+        effective_condition = self.condition
+        if self.policy_strategy != "static":
+            policy_kwargs = {}
+            if self.policy_artifact:
+                policy_kwargs["classifier_artifact"] = Path(self.policy_artifact)
+            policy = ModePolicy(self.policy_strategy, **policy_kwargs)
+            decision = policy.decide(task_id, instruction)
+            effective_condition = decision["mode"]
+            decision_json = json.dumps(decision)
+            await self.exec_as_agent(
+                environment,
+                command=f"mkdir -p /logs/agent && printf '%s\\n' {shlex.quote(decision_json)} > /logs/agent/mode_decision.json",
+            )
+
         provider, model = self.model_name.split("/", 1)
         formatted_instruction = instruction if not instruction.startswith("-") else f"\n{instruction}"
+        cli_flags = " ".join(part for part in [super().build_cli_flags(), condition_flags(effective_condition)] if part)
         command = (
             ". ~/.nvm/nvm.sh; "
             "pi --print --mode json "
             f"--provider {shlex.quote(provider)} --model {shlex.quote(model)} "
-            f"{self.build_cli_flags()} {shlex.quote(formatted_instruction)} "
+            f"{cli_flags} {shlex.quote(formatted_instruction)} "
             "2>&1 </dev/null | grep -v '\"type\":\"message_update\"' | "
             f"stdbuf -oL tee /logs/agent/{self._OUTPUT_FILENAME}"
         )

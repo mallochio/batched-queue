@@ -8,5 +8,6 @@ benchmarks/results/
 .*venv*
 __pycache__/
 *.pyc
+*.pkl
 benchmarks/terminal-bench/requirements.txt
 

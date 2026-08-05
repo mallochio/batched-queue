@@ -198,8 +198,107 @@ PY
     : "${2:?Usage: $0 summarize <job-directory>}"
     "$PYTHON" benchmarks/terminal-bench/summarize.py "$2"
     ;;
+  adaptive)
+    if [[ ${BQ_ALLOW_PAID_ADAPTIVE:-0} != 1 ]]; then
+      echo 'Refusing adaptive run: set BQ_ALLOW_PAID_ADAPTIVE=1 after approval.' >&2
+      exit 2
+    fi
+    : "${BQ_STRATEGY:=classifier}"
+    : "${BQ_CLASSIFIER_ARTIFACT:=benchmarks/mode_router/artifacts/classifier_v1}"
+    : "${BQ_LEDGER:=benchmarks/terminal-bench/discordance_ledger.json}"
+    : "${BQ_THINKING:=high}"
+    run_dir=${BQ_ADAPTIVE_DIR:-"benchmarks/results/terminal-bench/adaptive-slice-$(date -u +%Y%m%dT%H%M%SZ)"}
+    mkdir -p "$run_dir"
+    "$PYTHON" - "$BQ_STRATEGY" "$BQ_CLASSIFIER_ARTIFACT" "$BQ_LEDGER" "$run_dir" <<'PY'
+import json, sys, os
+from pathlib import Path
+from benchmarks.mode_router.instructions import load_instruction
+from benchmarks.mode_router.policy import ModePolicy
+strategy, artifact, ledger_path, run_dir = sys.argv[1:]
+ledger = json.loads(Path(ledger_path).read_text(encoding="utf-8"))
+tasks = ledger["tasks"]
+from benchmarks.mode_router.eval_slice import select_stratified_slice
+slice_tasks = select_stratified_slice(ledger)
+policy = ModePolicy(strategy, classifier_artifact=Path(artifact))
+rows=[]
+decisions=[]
+for task in slice_tasks:
+    info = tasks[task]
+    inst = info.get("instruction") or load_instruction(task)
+    dec = policy.decide(task, inst)
+    mode = dec["mode"]
+    outcome = info[mode].get("outcome") or "skipped_missing"
+    rows.append({
+        "task": task, "condition": "adaptive", "routed_mode": mode,
+        "outcome": "pass" if outcome=="pass" else "fail",
+        "reward": 1.0 if outcome=="pass" else 0.0,
+        "agentSeconds": info[mode].get("seconds"),
+        "turns": info[mode].get("turns"),
+        "toolCalls": info[mode].get("tool_calls"),
+        "costUsd": info[mode].get("cost_usd"),
+        "batchModes": {}, "batchActionsRequested":0, "maxBatchActions":0,
+        "inputTokens":0,"cacheTokens":0,"outputTokens":0,
+    })
+    decisions.append({"task":task,"mode":mode,"score":dec.get("score"),"features":dec.get("features")})
+summary={"runs":rows}
+Path(run_dir,"summary.json").write_text(json.dumps(summary,indent=2),encoding="utf-8")
+Path(run_dir,"mode-decisions.jsonl").write_text("\n".join(json.dumps(d) for d in decisions)+"\n",encoding="utf-8")
+# Inline paired analysis (mirrors benchmarks/terminal-bench/analyze.py without package import)
+pairs={}
+for r in rows: pairs.setdefault(r["task"],{})["adaptive"]=r["routed_mode"]
+passed=sum(1 for r in rows if r["outcome"]=="pass")
+print(json.dumps({
+  "adaptive_tasks": len(rows),
+  "adaptive_pass": passed,
+  "adaptive_pass_rate": passed/len(rows) if rows else 0,
+  "routed_modes": {m: sum(1 for r in rows if r["routed_mode"]==m) for m in {"native","batch"}},
+  "total_cost_usd": sum(r["costUsd"] or 0 for r in rows),
+}, indent=2))
+PY
+    ;;
+  adaptive-full)
+    if [[ ${BQ_ALLOW_PAID_FULL:-0} != 1 || ${BQ_ALLOW_PAID_ADAPTIVE:-0} != 1 ]]; then
+      echo 'Refusing paid adaptive-full run: set BQ_ALLOW_PAID_FULL=1 and BQ_ALLOW_PAID_ADAPTIVE=1 after approval.' >&2
+      exit 2
+    fi
+    : "${BQ_MODEL:?Set BQ_MODEL to provider/model}"
+    : "${BQ_THINKING:=high}"
+    : "${BQ_MAX_MODE_ROUTER_COST_USD:=55.00}"
+    : "${BQ_STRATEGY:=classifier}"
+    : "${BQ_CLASSIFIER_ARTIFACT:=benchmarks/mode_router/artifacts/classifier_v1}"
+    if [[ -n $(git status --porcelain) ]]; then
+      echo 'Refusing adaptive-full run from a dirty tree; commit the frozen harness first.' >&2
+      exit 2
+    fi
+    checkout=$(dataset_checkout)
+    run_dir=${BQ_RUN_DIR:-"benchmarks/results/terminal-bench/adaptive-full-$(date -u +%Y%m%dT%H%M%SZ)"}
+    mkdir -p "$run_dir"
+    if [[ ! -f "$run_dir/plan.txt" ]]; then
+      all_tasks=()
+      while IFS= read -r task; do all_tasks+=("$task"); done < <(
+        find "$checkout/tasks" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort
+      )
+      make_plan "${all_tasks[@]}" > "$run_dir/plan.txt"
+    fi
+    while read -r task _ _; do
+      [[ -f "$run_dir/$task-adaptive/result.json" ]] && continue
+      spent=$("$PYTHON" benchmarks/terminal-bench/summarize.py "$run_dir" --cost-only)
+      "$PYTHON" - "$spent" "$BQ_MAX_MODE_ROUTER_COST_USD" <<'PY'
+import sys
+if float(sys.argv[1]) >= float(sys.argv[2]):
+    raise SystemExit(f"Adaptive-full cost gate reached: ${float(sys.argv[1]):.4f} >= ${float(sys.argv[2]):.2f}")
+PY
+      "$HARBOR" run "${common[@]}" --include-task-name "$task" \
+        --model "$BQ_MODEL" --ak "policy_strategy=$BQ_STRATEGY" \
+        --ak "policy_artifact=$BQ_CLASSIFIER_ARTIFACT" \
+        --ak "condition=native" --ak "thinking=$BQ_THINKING" \
+        --job-name "$task-adaptive" --jobs-dir "$run_dir"
+      require_valid_job "$run_dir/$task-adaptive"
+    done < "$run_dir/plan.txt"
+    "$PYTHON" benchmarks/terminal-bench/summarize.py "$run_dir" | tee "$run_dir/summary.json"
+    ;;
   *)
-    echo "Usage: $0 [validate|install-check|smoke|pilot|full|summarize <dir>]" >&2
+    echo "Usage: $0 [validate|install-check|smoke|pilot|full|adaptive|adaptive-full|summarize <dir>]" >&2
     exit 2
     ;;
 esac

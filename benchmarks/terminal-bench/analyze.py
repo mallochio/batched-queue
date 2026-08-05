@@ -38,8 +38,15 @@ def analyze(summary: dict[str, Any]) -> dict[str, Any]:
     for row in summary["runs"]:
         pairs.setdefault(row["task"], {})[row["condition"]] = row
     complete = {task: pair for task, pair in pairs.items() if {"native", "batch"} <= pair.keys()}
-    batch_only = sum(pair["batch"]["outcome"] == "pass" and pair["native"]["outcome"] != "pass" for pair in complete.values())
-    native_only = sum(pair["native"]["outcome"] == "pass" and pair["batch"]["outcome"] != "pass" for pair in complete.values())
+    incomplete = {task: list(pair.keys()) for task, pair in pairs.items() if not ({"native", "batch"} <= pair.keys())}
+    
+    batch_only_tasks = sorted([task for task, pair in complete.items() if pair["batch"]["outcome"] == "pass" and pair["native"]["outcome"] != "pass"])
+    native_only_tasks = sorted([task for task, pair in complete.items() if pair["native"]["outcome"] == "pass" and pair["batch"]["outcome"] != "pass"])
+    both_pass_tasks = sorted([task for task, pair in complete.items() if pair["batch"]["outcome"] == "pass" and pair["native"]["outcome"] == "pass"])
+    neither_pass_tasks = sorted([task for task, pair in complete.items() if pair["batch"]["outcome"] != "pass" and pair["native"]["outcome"] != "pass"])
+
+    batch_queue_invocations = sum(1 for pair in complete.values() if pair["batch"].get("tools", {}).get("batch_queue", 0) > 0)
+    adoption_rate = batch_queue_invocations / len(complete) if complete else 0.0
 
     metrics: dict[str, Any] = {}
     extractors = {
@@ -57,14 +64,37 @@ def analyze(summary: dict[str, Any]) -> dict[str, Any]:
             "bootstrap95Ci": bootstrap_ci(deltas),
         }
 
+    oracle_ceiling = len(both_pass_tasks) + len(batch_only_tasks) + len(native_only_tasks)
+    native_pass = sum(pair["native"]["outcome"] == "pass" for pair in complete.values())
+    batch_pass = sum(pair["batch"]["outcome"] == "pass" for pair in complete.values())
+
     return {
+        "totalTasksInSummary": len(pairs),
         "pairedTasks": len(complete),
+        "incompleteTasks": incomplete,
+        "queueAdoption": {
+            "invokedEpisodes": batch_queue_invocations,
+            "totalBatchAvailableEpisodes": len(complete),
+            "adoptionRate": adoption_rate,
+        },
         "success": {
-            "batch": sum(pair["batch"]["outcome"] == "pass" for pair in complete.values()),
-            "native": sum(pair["native"]["outcome"] == "pass" for pair in complete.values()),
-            "batchOnly": batch_only,
-            "nativeOnly": native_only,
-            "mcnemarExactP": mcnemar_exact(batch_only, native_only),
+            "nativePass": native_pass,
+            "nativePassRate": native_pass / len(complete) if complete else 0,
+            "batchPass": batch_pass,
+            "batchPassRate": batch_pass / len(complete) if complete else 0,
+            "oracleCeilingPass": oracle_ceiling,
+            "oracleCeilingPassRate": oracle_ceiling / len(complete) if complete else 0,
+            "nativeRegretVsOracle": (oracle_ceiling - native_pass) / len(complete) if complete else 0,
+            "batchRegretVsOracle": (oracle_ceiling - batch_pass) / len(complete) if complete else 0,
+            "batchOnly": len(batch_only_tasks),
+            "nativeOnly": len(native_only_tasks),
+            "bothPass": len(both_pass_tasks),
+            "neitherPass": len(neither_pass_tasks),
+            "mcnemarExactP": mcnemar_exact(len(batch_only_tasks), len(native_only_tasks)),
+        },
+        "discordantTasks": {
+            "batchOnly": batch_only_tasks,
+            "nativeOnly": native_only_tasks,
         },
         "metrics": metrics,
     }

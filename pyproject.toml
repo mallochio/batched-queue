@@ -5,6 +5,7 @@ description = "Python tooling for the batched-queue benchmarks"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "harbor @ git+https://github.com/harbor-framework/harbor.git@1393655243125f1d63f81f9bd2f217eefaba3633",
+    "scikit-learn>=1.9.0",
 ]
 
 [tool.uv]
