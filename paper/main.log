@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.3.5)  4 AUG 2026 09:41
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.3.5)  5 AUG 2026 05:56
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -515,8 +515,8 @@ File: ts1ptm.fd 2001/06/04 font definitions for TS1/ptm.
 r/local/texlive/2026basic/texmf-dist/fonts/enc/dvips/base/8r.enc}]
 LaTeX Font Info:    Font shape `T1/cmtt/bx/n' in size <14.4> not available
 (Font)              Font shape `T1/cmtt/m/n' tried instead on input line 71.
- [2] [3] [4]
-(./main.bbl [5]) [6]
+ [2] [3] [4] [5]
+(./main.bbl) [6]
 (/usr/local/texlive/2026basic/texmf-dist/tex/latex/listings/lstlang1.sty
 File: lstlang1.sty 2025/11/14 1.11b listings language file
 )
@@ -524,7 +524,7 @@ File: lstlang1.sty 2025/11/14 1.11b listings language file
 File: lstlang1.sty 2025/11/14 1.11b listings language file
 )
 LaTeX Font Info:    Font shape `T1/cmtt/bx/n' in size <9> not available
-(Font)              Font shape `T1/cmtt/m/n' tried instead on input line 272.
+(Font)              Font shape `T1/cmtt/m/n' tried instead on input line 304.
 
 [7] (./main.aux)
  ***********
@@ -532,36 +532,40 @@ LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
  ***********
 Package rerunfilecheck Info: File `main.out' has not changed.
-(rerunfilecheck)             Checksum: 1CEC717C80AC426EFB5ED1CC86E71C33;4116.
+(rerunfilecheck)             Checksum: 728A67377CECD86B3DE6B8F4E5AF523D;4321.
  ) 
 Here is how much of TeX's memory you used:
- 14221 strings out of 469006
- 217273 string characters out of 5454814
- 839505 words of memory out of 5000000
- 42676 multiletter control sequences out of 15000+600000
- 662405 words of font info for 85 fonts, out of 8000000 for 9000
+ 14230 strings out of 469006
+ 217419 string characters out of 5454814
+ 839607 words of memory out of 5000000
+ 42682 multiletter control sequences out of 15000+600000
+ 665693 words of font info for 87 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
- 75i,9n,79p,1636b,1217s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 75i,9n,79p,1822b,1217s stack positions out of 10000i,1000n,20000p,200000b,200000s
  </Users/sid/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/
 ectt1440.600pk> </Users/sid/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour
 /jknappen/ec/ectt1000.600pk> </Users/sid/Library/texlive/2026basic/texmf-var/fo
 nts/pk/ljfour/jknappen/ec/ectt0900.600pk> </Users/sid/Library/texlive/2026basic
 /texmf-var/fonts/pk/ljfour/jknappen/ec/ectt1200.600pk></usr/local/texlive/2026b
-asic/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2
-026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/texliv
-e/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb></usr/local/tex
-live/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/
-texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/loca
-l/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/lo
-cal/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></us
-r/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy9.pfb><
-/usr/local/texlive/2026basic/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/
-local/texlive/2026basic/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local
-/texlive/2026basic/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on main.pdf (7 pages, 186905 bytes).
+asic/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2
+026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texli
+ve/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/te
+xlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb></usr/local
+/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/lo
+cal/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/
+local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></us
+r/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb>
+</usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.p
+fb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy
+9.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/symb
+ols/msbm10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/urw/times/u
+tmb8a.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/urw/times/utmr8a
+.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/urw/times/utmri8a.pfb
+>
+Output written on main.pdf (7 pages, 215293 bytes).
 PDF statistics:
- 390 PDF objects out of 1000 (max. 8388607)
- 218 compressed objects within 3 object streams
- 62 named destinations out of 1000 (max. 500000)
- 153 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 413 PDF objects out of 1000 (max. 8388607)
+ 235 compressed objects within 3 object streams
+ 65 named destinations out of 1000 (max. 500000)
+ 161 words of extra memory for PDF output out of 10000 (max. 10000000)
 
