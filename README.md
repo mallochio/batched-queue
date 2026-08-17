@@ -206,7 +206,7 @@ The planner / driver model is always your main session model. An optional cheap 
 Example:
 
 ```bash
-export BATCH_QUEUE_EXECUTOR=bifrost/vertex/google/gemini-3.7-flash
+export BATCH_QUEUE_EXECUTOR=bifrost/gemini-3.7-flash
 export BATCH_QUEUE_EXECUTOR_BASE_URL=http://127.0.0.1:8080/v1
 export BATCH_QUEUE_EXECUTOR_API_KEY="$BIFROST_API_KEY"
 pi --provider openai --model gpt-5.4-mini

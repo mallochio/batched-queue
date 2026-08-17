@@ -34,7 +34,7 @@ describe("objective executor configuration", () => {
 	});
 
 	it("reads the model, endpoint, key, and thinking only from env", () => {
-		process.env.BATCH_QUEUE_EXECUTOR = "bifrost/vertex/google/gemini-3.7-flash";
+		process.env.BATCH_QUEUE_EXECUTOR = "bifrost/gemini-3.7-flash";
 		process.env.BATCH_QUEUE_EXECUTOR_BASE_URL = "http://127.0.0.1:8080/v1";
 		process.env.BATCH_QUEUE_EXECUTOR_API_KEY = "sk-test";
 		process.env.BATCH_QUEUE_EXECUTOR_THINKING = "high";
@@ -42,7 +42,7 @@ describe("objective executor configuration", () => {
 		const resolved = resolveBatchQueueConfig();
 		expect(resolved.executorModel).toEqual({
 			provider: "bifrost",
-			id: "vertex/google/gemini-3.7-flash",
+			id: "gemini-3.7-flash",
 		});
 		expect(resolved.executorBaseUrl).toBe("http://127.0.0.1:8080/v1");
 		expect(resolved.executorApiKey).toBe("sk-test");
@@ -52,10 +52,10 @@ describe("objective executor configuration", () => {
 	it("supports split provider and model env vars", () => {
 		delete process.env.BATCH_QUEUE_EXECUTOR;
 		process.env.BATCH_QUEUE_EXECUTOR_PROVIDER = "bifrost";
-		process.env.BATCH_QUEUE_EXECUTOR_MODEL = "vertex/google/gemini-3.7-flash";
+		process.env.BATCH_QUEUE_EXECUTOR_MODEL = "gemini-3.7-flash";
 		expect(resolveBatchQueueConfig().executorModel).toEqual({
 			provider: "bifrost",
-			id: "vertex/google/gemini-3.7-flash",
+			id: "gemini-3.7-flash",
 		});
 	});
 });
