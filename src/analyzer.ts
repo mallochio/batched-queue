@@ -340,21 +340,41 @@ export function resolvePlanningModel(
 	planningRef: { readonly provider: string; readonly id: string },
 	driverModel: Model<Api>,
 	modelRegistry: ModelRegistry,
+	customEndpoint?: { readonly baseUrl?: string },
 ): Model<Api> {
 	const found = modelRegistry.find(planningRef.provider, planningRef.id);
 	if (found) {
+		if (customEndpoint?.baseUrl) {
+			return { ...found, baseUrl: customEndpoint.baseUrl };
+		}
 		return found;
 	}
 
 	if (planningRef.provider === driverModel.provider) {
-		if (planningRef.id === driverModel.id) {
+		if (planningRef.id === driverModel.id && !customEndpoint?.baseUrl) {
 			return driverModel;
 		}
 		return {
 			...driverModel,
 			id: planningRef.id,
 			name: planningRef.id,
+			baseUrl: customEndpoint?.baseUrl ?? driverModel.baseUrl,
 			reasoning: false,
+		};
+	}
+
+	if (customEndpoint?.baseUrl) {
+		return {
+			id: planningRef.id,
+			name: planningRef.id,
+			api: "openai-completions",
+			provider: planningRef.provider as Model<Api>["provider"],
+			baseUrl: customEndpoint.baseUrl,
+			reasoning: false,
+			input: ["text"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 128_000,
+			maxTokens: 16_384,
 		};
 	}
 
@@ -388,10 +408,13 @@ export async function analyzeBatchObjective(
 		planningRef,
 		driverModel,
 		modelRegistry,
+		config.executorBaseUrl ? { baseUrl: config.executorBaseUrl } : undefined,
 	);
 
 	const auth = await modelRegistry.getApiKeyAndHeaders(planningModel);
-	if (!auth.ok) {
+	const apiKey = config.executorApiKey ?? (auth.ok ? auth.apiKey : undefined);
+	const headers = auth.ok ? auth.headers : undefined;
+	if (!apiKey && !auth.ok) {
 		throw new Error(auth.error);
 	}
 	const usageAccumulator = emptyPlannerUsage(planningRef.provider, planningRef.id);
@@ -400,7 +423,7 @@ export async function analyzeBatchObjective(
 		objective,
 		config,
 		cwd,
-		complete: (context, options) => complete(planningModel, context, { apiKey: auth.apiKey, headers: auth.headers, ...options }),
+		complete: (context, options) => complete(planningModel, context, { apiKey, headers, ...options }),
 		runInspect: (name, args) => runInspectTool(name, args, cwd),
 		signal,
 		usageAccumulator,

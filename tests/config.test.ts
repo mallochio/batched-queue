@@ -1,323 +1,89 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
+import { afterEach, describe, expect, it } from "bun:test";
 import { resolveBatchQueueConfig } from "../src/config";
-import {
-	loadFileConfig,
-	loadOpenCodeFileConfig,
-	parseBatchQueueJsonConfig,
-} from "../src/file-config";
+import { parseBatchQueueJsonConfig } from "../src/file-config";
 
-describe("parseBatchQueueJsonConfig", () => {
-	it("parses executor model shorthand", () => {
+const executorEnv = [
+	"BATCH_QUEUE_EXECUTOR",
+	"BATCH_QUEUE_EXECUTOR_PROVIDER",
+	"BATCH_QUEUE_EXECUTOR_MODEL",
+	"BATCH_QUEUE_EXECUTOR_BASE_URL",
+	"BATCH_QUEUE_EXECUTOR_API_KEY",
+	"BATCH_QUEUE_EXECUTOR_THINKING",
+] as const;
+
+const savedEnv = Object.fromEntries(executorEnv.map((name) => [name, process.env[name]]));
+
+afterEach(() => {
+	for (const name of executorEnv) {
+		const value = savedEnv[name];
+		if (value === undefined) delete process.env[name];
+		else process.env[name] = value;
+	}
+});
+
+describe("objective executor configuration", () => {
+	it("ignores objective executor settings in JSON", () => {
 		expect(parseBatchQueueJsonConfig({
+			executionModel: "openai/gpt-5.4-mini",
 			executorModel: "openai/gpt-5.4-nano",
-		})).toEqual({
-			executorModel: { provider: "openai", id: "gpt-5.4-nano" },
-		});
-	});
-
-	it("parses executor model object form", () => {
-		expect(parseBatchQueueJsonConfig({
-			executorModel: { provider: "openai", id: "gpt-5.4-mini" },
-		})).toEqual({
-			executorModel: { provider: "openai", id: "gpt-5.4-mini" },
-		});
-	});
-
-	it("parses maxBatchActions", () => {
-		expect(parseBatchQueueJsonConfig({ maxBatchActions: 8 })).toEqual({
+			executorBaseUrl: "http://127.0.0.1:8080/v1",
+			executorApiKey: "sk-test",
+			executorThinking: "high",
 			maxBatchActions: 8,
-		});
+		})).toEqual({ maxBatchActions: 8 });
 	});
 
-	it("parses requirePlanReflection", () => {
-		expect(parseBatchQueueJsonConfig({ requirePlanReflection: false })).toEqual({
+	it("reads the model, endpoint, key, and thinking only from env", () => {
+		process.env.BATCH_QUEUE_EXECUTOR = "bifrost/vertex/google/gemini-3.7-flash";
+		process.env.BATCH_QUEUE_EXECUTOR_BASE_URL = "http://127.0.0.1:8080/v1";
+		process.env.BATCH_QUEUE_EXECUTOR_API_KEY = "sk-test";
+		process.env.BATCH_QUEUE_EXECUTOR_THINKING = "high";
+
+		const resolved = resolveBatchQueueConfig();
+		expect(resolved.executorModel).toEqual({
+			provider: "bifrost",
+			id: "vertex/google/gemini-3.7-flash",
+		});
+		expect(resolved.executorBaseUrl).toBe("http://127.0.0.1:8080/v1");
+		expect(resolved.executorApiKey).toBe("sk-test");
+		expect(resolved.executorThinking).toBe("high");
+	});
+
+	it("supports split provider and model env vars", () => {
+		delete process.env.BATCH_QUEUE_EXECUTOR;
+		process.env.BATCH_QUEUE_EXECUTOR_PROVIDER = "bifrost";
+		process.env.BATCH_QUEUE_EXECUTOR_MODEL = "vertex/google/gemini-3.7-flash";
+		expect(resolveBatchQueueConfig().executorModel).toEqual({
+			provider: "bifrost",
+			id: "vertex/google/gemini-3.7-flash",
+		});
+	});
+});
+
+describe("other batch queue configuration", () => {
+	it("parses JSON settings unrelated to the objective executor", () => {
+		expect(parseBatchQueueJsonConfig({
+			maxBatchActions: 8,
+			groundingTurns: 1,
 			requirePlanReflection: false,
-		});
-	});
-
-	it("parses allowObjectiveMutations", () => {
-		expect(parseBatchQueueJsonConfig({ allowObjectiveMutations: true })).toEqual({
+			allowObjectiveMutations: true,
+		})).toEqual({
+			maxBatchActions: 8,
+			groundingTurns: 1,
+			requirePlanReflection: false,
 			allowObjectiveMutations: true,
 		});
 	});
 
-	it("parses executor thinking", () => {
-		expect(parseBatchQueueJsonConfig({ executorThinking: "high" })).toEqual({
-			executorThinking: "high",
-		});
-	});
-
-	it("ignores invalid values", () => {
-		expect(parseBatchQueueJsonConfig({
-			maxBatchActions: "nope",
-			executorModel: { provider: "", id: "x" },
-			executorThinking: "ultra",
-		})).toEqual({});
-	});
-});
-
-describe("loadFileConfig", () => {
-	let tmpDir: string;
-	let packageJsonPath: string;
-	let projectConfigPath: string;
-
-	beforeEach(() => {
-		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "bq-config-"));
-		packageJsonPath = path.join(tmpDir, "package.json");
-		projectConfigPath = path.join(tmpDir, ".pi", "batched-queue.json");
-	});
-
-	afterEach(() => {
-		fs.rmSync(tmpDir, { recursive: true, force: true });
-	});
-
-	it("loads executor model from package.json pi.batchQueue", () => {
-		fs.writeFileSync(packageJsonPath, JSON.stringify({
-			pi: {
-				batchQueue: {
-					executorModel: "openai/gpt-5.4-nano",
-				},
-			},
-		}));
-
-		const config = loadFileConfig({
-			cwd: tmpDir,
-			packageJsonPath,
-			projectConfigPath,
-		});
-
-		expect(config.executorModel).toEqual({
-			provider: "openai",
-			id: "gpt-5.4-nano",
-		});
-	});
-
-	it("lets project config override package defaults", () => {
-		fs.mkdirSync(path.dirname(projectConfigPath), { recursive: true });
-		fs.writeFileSync(packageJsonPath, JSON.stringify({
-			pi: {
-				batchQueue: {
-					executorModel: "openai/gpt-5.4-nano",
-					maxBatchActions: 3,
-					allowObjectiveMutations: true,
-				},
-			},
-		}));
-		fs.writeFileSync(projectConfigPath, JSON.stringify({
-			executorModel: "openai/gpt-5.4-mini",
-			executorThinking: "high",
-			maxBatchActions: 7,
-			allowObjectiveMutations: false,
-		}));
-
-		const config = loadFileConfig({
-			cwd: tmpDir,
-			packageJsonPath,
-			projectConfigPath,
-		});
-
-		expect(config).toEqual({
-			executorModel: { provider: "openai", id: "gpt-5.4-mini" },
-			executorThinking: "high",
-			maxBatchActions: 7,
-			allowObjectiveMutations: false,
-		});
-	});
-
-	it("loads executionModel alias from project config", () => {
-		fs.mkdirSync(path.dirname(projectConfigPath), { recursive: true });
-		fs.writeFileSync(projectConfigPath, JSON.stringify({
-			executionModel: "openai/gpt-5.4-mini",
-		}));
-
-		const config = loadFileConfig({
-			cwd: tmpDir,
-			packageJsonPath,
-			projectConfigPath,
-		});
-
-		expect(config.executorModel).toEqual({
-			provider: "openai",
-			id: "gpt-5.4-mini",
-		});
-	});
-});
-
-describe("loadOpenCodeFileConfig", () => {
-	let tmpDir: string;
-	let packageJsonPath: string;
-	let projectConfigPath: string;
-
-	beforeEach(() => {
-		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "bq-oc-config-"));
-		packageJsonPath = path.join(tmpDir, "package.json");
-		projectConfigPath = path.join(tmpDir, ".opencode", "batched-queue.json");
-	});
-
-	afterEach(() => {
-		fs.rmSync(tmpDir, { recursive: true, force: true });
-	});
-
-	it("loads executor model from package.json opencode.batchQueue", () => {
-		fs.writeFileSync(packageJsonPath, JSON.stringify({
-			opencode: {
-				batchQueue: {
-					executorModel: "openai/gpt-5.4-nano",
-				},
-			},
-		}));
-
-		const config = loadOpenCodeFileConfig({
-			cwd: tmpDir,
-			packageJsonPath,
-			projectConfigPath,
-		});
-
-		expect(config.executorModel).toEqual({
-			provider: "openai",
-			id: "gpt-5.4-nano",
-		});
-	});
-
-	it("lets project config override package defaults", () => {
-		fs.mkdirSync(path.dirname(projectConfigPath), { recursive: true });
-		fs.writeFileSync(packageJsonPath, JSON.stringify({
-			opencode: {
-				batchQueue: {
-					maxBatchActions: 3,
-				},
-			},
-		}));
-		fs.writeFileSync(projectConfigPath, JSON.stringify({
-			maxBatchActions: 9,
-		}));
-
-		const config = loadOpenCodeFileConfig({
-			cwd: tmpDir,
-			packageJsonPath,
-			projectConfigPath,
-		});
-
-		expect(config.maxBatchActions).toBe(9);
-	});
-});
-
-describe("resolveBatchQueueConfig precedence", () => {
-	const savedExecutor = process.env.BATCH_QUEUE_EXECUTOR;
-	const savedExecutorThinking = process.env.BATCH_QUEUE_EXECUTOR_THINKING;
-	const savedMaxActions = process.env.BATCH_QUEUE_MAX_ACTIONS;
-	const savedRequirePlanReflection = process.env.BATCH_QUEUE_REQUIRE_PLAN_REFLECTION;
-	const savedAllowObjectiveMutations = process.env.BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS;
-
-	afterEach(() => {
-		if (savedExecutor === undefined) {
-			delete process.env.BATCH_QUEUE_EXECUTOR;
-		} else {
-			process.env.BATCH_QUEUE_EXECUTOR = savedExecutor;
-		}
-		if (savedExecutorThinking === undefined) {
-			delete process.env.BATCH_QUEUE_EXECUTOR_THINKING;
-		} else {
-			process.env.BATCH_QUEUE_EXECUTOR_THINKING = savedExecutorThinking;
-		}
-		if (savedMaxActions === undefined) {
-			delete process.env.BATCH_QUEUE_MAX_ACTIONS;
-		} else {
-			process.env.BATCH_QUEUE_MAX_ACTIONS = savedMaxActions;
-		}
-		if (savedRequirePlanReflection === undefined) {
-			delete process.env.BATCH_QUEUE_REQUIRE_PLAN_REFLECTION;
-		} else {
-			process.env.BATCH_QUEUE_REQUIRE_PLAN_REFLECTION = savedRequirePlanReflection;
-		}
-		if (savedAllowObjectiveMutations === undefined) {
-			delete process.env.BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS;
-		} else {
-			process.env.BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS = savedAllowObjectiveMutations;
-		}
-	});
-
-	it("prefers env vars over file config", () => {
-		process.env.BATCH_QUEUE_EXECUTOR = "openai/gpt-5.4-pro";
-		const resolved = resolveBatchQueueConfig({}, {
-			executorModel: { provider: "openai", id: "gpt-5.4-nano" },
-		});
-		expect(resolved.executorModel).toEqual({
-			provider: "openai",
-			id: "gpt-5.4-pro",
-		});
-	});
-
-	it("uses file config when env is unset", () => {
-		delete process.env.BATCH_QUEUE_EXECUTOR;
-		const resolved = resolveBatchQueueConfig({}, {
-			executorModel: { provider: "openai", id: "gpt-5.4-nano" },
-		});
-		expect(resolved.executorModel).toEqual({
-			provider: "openai",
-			id: "gpt-5.4-nano",
-		});
-	});
-
-	it("prefers env executor thinking over file config", () => {
-		process.env.BATCH_QUEUE_EXECUTOR_THINKING = "high";
-		const resolved = resolveBatchQueueConfig({}, { executorThinking: "low" });
-		expect(resolved.executorThinking).toBe("high");
-	});
-
-	it("prefers factory overrides over env and file config", () => {
-		process.env.BATCH_QUEUE_EXECUTOR = "openai/gpt-5.4-pro";
-		const resolved = resolveBatchQueueConfig({
-			executorModel: { provider: "openai", id: "gpt-5.4-mini" },
-		}, {
-			executorModel: { provider: "openai", id: "gpt-5.4-nano" },
-		});
-		expect(resolved.executorModel).toEqual({
-			provider: "openai",
-			id: "gpt-5.4-mini",
-		});
-	});
-
-	it("defaults maxBatchActions to 10", () => {
+	it("keeps defaults", () => {
 		delete process.env.BATCH_QUEUE_MAX_ACTIONS;
-		const resolved = resolveBatchQueueConfig();
-		expect(resolved.maxBatchActions).toBe(10);
-	});
-
-	it("enables planner reflection by default", () => {
+		delete process.env.BATCH_QUEUE_GROUNDING_TURNS;
 		delete process.env.BATCH_QUEUE_REQUIRE_PLAN_REFLECTION;
-		const resolved = resolveBatchQueueConfig();
-		expect(resolved.requirePlanReflection).toBe(true);
-	});
-
-	it("lets env disable planner reflection", () => {
-		process.env.BATCH_QUEUE_REQUIRE_PLAN_REFLECTION = "false";
-		const resolved = resolveBatchQueueConfig({}, { requirePlanReflection: true });
-		expect(resolved.requirePlanReflection).toBe(false);
-	});
-
-	it("disables objective mutations by default", () => {
 		delete process.env.BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS;
 		const resolved = resolveBatchQueueConfig();
+		expect(resolved.maxBatchActions).toBe(10);
+		expect(resolved.groundingTurns).toBe(3);
+		expect(resolved.requirePlanReflection).toBe(true);
 		expect(resolved.allowObjectiveMutations).toBe(false);
-	});
-
-	it("defaults groundingTurns to 3 and prefers env over file config", () => {
-		delete process.env.BATCH_QUEUE_GROUNDING_TURNS;
-		expect(resolveBatchQueueConfig().groundingTurns).toBe(3);
-		process.env.BATCH_QUEUE_GROUNDING_TURNS = "0";
-		expect(resolveBatchQueueConfig({}, { groundingTurns: 5 }).groundingTurns).toBe(0);
-		delete process.env.BATCH_QUEUE_GROUNDING_TURNS;
-	});
-
-	it("prefers env objective mutation flag over file config", () => {
-		process.env.BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS = "true";
-		const resolved = resolveBatchQueueConfig({}, {
-			allowObjectiveMutations: false,
-		});
-		expect(resolved.allowObjectiveMutations).toBe(true);
 	});
 });

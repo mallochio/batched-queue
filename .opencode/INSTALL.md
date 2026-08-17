@@ -79,7 +79,7 @@ Settings merge in this order (highest wins):
 
 Copy [`.opencode/batched-queue.json.example`](batched-queue.json.example) to `.opencode/batched-queue.json`.
 
-The planner / driver model is inherited from your OpenCode session (`opencode.json` → `model` or per-session selection). Only an optional cheap `executionModel` (alias: `executorModel`) needs configuration for objective batches. Set `executorThinking` (`minimal`, `low`, `medium`, `high`, `xhigh`) to forward a best-effort prompt variant for the objective planner.
+The planner / driver model is inherited from your OpenCode session (`opencode.json` → `model` or per-session selection). Configure an optional objective executor only through `BATCH_QUEUE_EXECUTOR` and related environment variables.
 
 ## Verify
 
@@ -122,7 +122,7 @@ export { BatchedQueuePlugin } from "batched-queue/src/opencode/plugin.ts";
 
 ### Objective mode errors
 
-Set `executionModel` in `.opencode/batched-queue.json` or `BATCH_QUEUE_EXECUTOR=provider/model` when you want a cheaper model for objective→actions conversion. Set `executorThinking` or `BATCH_QUEUE_EXECUTOR_THINKING=high` to request higher planning effort. When unset, the session driver plans objective batches. Ensure the parent session has a model selected.
+Set `BATCH_QUEUE_EXECUTOR=provider/model` when you want a separate model for objective→actions conversion. Optional endpoint settings are `BATCH_QUEUE_EXECUTOR_BASE_URL`, `BATCH_QUEUE_EXECUTOR_API_KEY`, and `BATCH_QUEUE_EXECUTOR_THINKING`. When unset, the session driver plans objective batches.
 
 ### Updating
 

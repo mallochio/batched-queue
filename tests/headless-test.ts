@@ -48,8 +48,8 @@ if (registeredTool.definition.executionMode !== "sequential") {
 	process.exit(1);
 }
 
-if (!registeredTool.definition.promptSnippet?.includes("dependent repo steps")) {
-	console.error("batch_queue promptSnippet missing dependent-step guidance");
+if (!registeredTool.definition.promptSnippet?.includes("related repo work")) {
+	console.error("batch_queue promptSnippet missing batch preference guidance");
 	process.exit(1);
 }
 

@@ -63,6 +63,18 @@ describe("resolvePlanningModel", () => {
 		expect(resolved.reasoning).toBe(false);
 	});
 
+	it("overrides baseUrl when a custom endpoint is supplied", () => {
+		const resolved = resolvePlanningModel(
+			{ provider: "bifrost", id: "vertex/google/gemini-3.7-flash" },
+			driver,
+			registry([]),
+			{ baseUrl: "http://127.0.0.1:8080/v1" },
+		);
+		expect(resolved.id).toBe("vertex/google/gemini-3.7-flash");
+		expect(resolved.baseUrl).toBe("http://127.0.0.1:8080/v1");
+		expect(resolved.api).toBe("openai-completions");
+	});
+
 	it("throws for an unknown model on a different provider", () => {
 		expect(() =>
 			resolvePlanningModel(

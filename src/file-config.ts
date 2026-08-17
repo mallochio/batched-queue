@@ -1,8 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { BatchQueueConfig, ExecutorThinkingLevel, ModelRef } from "./config.js";
-import { parseExecutorThinking, parseModelRefString } from "./config.js";
+import type { BatchQueueConfig } from "./config.js";
 
 const PI_PROJECT_CONFIG_RELATIVE = path.join(".pi", "batched-queue.json");
 const OPENCODE_PROJECT_CONFIG_RELATIVE = path.join(".opencode", "batched-queue.json");
@@ -19,9 +18,6 @@ const TARGET_SETTINGS: Record<ConfigTarget, { readonly section: "pi" | "opencode
 
 export interface BatchQueueJsonConfig {
 	readonly maxBatchActions?: number;
-	readonly executorModel?: string | ModelRef;
-	readonly executionModel?: string | ModelRef;
-	readonly executorThinking?: ExecutorThinkingLevel;
 	readonly groundingTurns?: number;
 	readonly requirePlanReflection?: boolean;
 	readonly allowObjectiveMutations?: boolean;
@@ -29,21 +25,6 @@ export interface BatchQueueJsonConfig {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function parseModelRefValue(value: unknown): ModelRef | undefined {
-	if (typeof value === "string" && value.trim()) {
-		return parseModelRefString(value);
-	}
-	if (!isRecord(value)) {
-		return undefined;
-	}
-	const provider = typeof value.provider === "string" ? value.provider.trim() : "";
-	const id = typeof value.id === "string" ? value.id.trim() : "";
-	if (!provider || !id) {
-		return undefined;
-	}
-	return { provider, id };
 }
 
 export function parseBatchQueueJsonConfig(raw: unknown): BatchQueueConfig {
@@ -54,18 +35,6 @@ export function parseBatchQueueJsonConfig(raw: unknown): BatchQueueConfig {
 	const config: BatchQueueConfig = {};
 	if (typeof raw.maxBatchActions === "number" && Number.isFinite(raw.maxBatchActions)) {
 		config.maxBatchActions = raw.maxBatchActions;
-	}
-
-	const executorModel =
-		parseModelRefValue(raw.executionModel) ??
-		parseModelRefValue(raw.executorModel);
-	if (executorModel) {
-		config.executorModel = executorModel;
-	}
-
-	const executorThinking = parseExecutorThinking(raw.executorThinking);
-	if (executorThinking) {
-		config.executorThinking = executorThinking;
 	}
 
 	if (typeof raw.groundingTurns === "number" && Number.isFinite(raw.groundingTurns) && raw.groundingTurns >= 0) {

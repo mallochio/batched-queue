@@ -96,7 +96,7 @@ export async function executeBatchQueue(options: {
 		} else if (params.objective?.trim()) {
 			if (!deps.resolveObjective) {
 				return {
-					text: "batch_queue objective mode requires a session driver model or executionModel in config",
+					text: "batch_queue objective mode requires a session driver model or BATCH_QUEUE_EXECUTOR",
 					isError: true,
 					error: "missing objective resolver",
 				};

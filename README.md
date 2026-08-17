@@ -162,8 +162,6 @@ Project-local config in `.pi/batched-queue.json`:
 
 ```json
 {
-  "executionModel": "openai/gpt-5.4-nano",
-  "executorThinking": "high",
   "groundingTurns": 3,
   "requirePlanReflection": true,
   "maxBatchActions": 10,
@@ -171,7 +169,7 @@ Project-local config in `.pi/batched-queue.json`:
 }
 ```
 
-`executionModel` (alias: `executorModel`) accepts either `provider/model` shorthand or `{ "provider": "...", "id": "..." }`. When unset, objective batches use your session driver / planner model. `executorThinking` is optional (`minimal`, `low`, `medium`, `high`, `xhigh`) and is forwarded best-effort as Pi `reasoningEffort` or OpenCode prompt `variant`. `groundingTurns` (default `3`) lets the objective planner read/grep the real repo before it plans; set `0` to plan blind in one shot (Pi objective mode only). `requirePlanReflection` (default `true`) asks objective planners to attach structured confidence, success criteria, risks, and fallback metadata to submitted batches.
+`groundingTurns` (default `3`) lets the objective planner read/grep the real repo before it plans; set `0` to plan blind in one shot (Pi objective mode only). `requirePlanReflection` (default `true`) asks objective planners to attach structured confidence, success criteria, risks, and fallback metadata to submitted batches. Objective executor model, endpoint, key, and thinking are configured only through environment variables.
 
 Package defaults can live in `package.json`:
 
@@ -179,7 +177,6 @@ Package defaults can live in `package.json`:
 {
   "pi": {
     "batchQueue": {
-      "executionModel": "openai/gpt-5.4-nano",
       "maxBatchActions": 10,
       "allowObjectiveMutations": false
     }
@@ -194,9 +191,11 @@ Copy `.pi/batched-queue.json.example` to `.pi/batched-queue.json` to get started
 Optional environment variables:
 
 - `BATCH_QUEUE_MAX_ACTIONS`: max actions per batch, default `10`
-- `BATCH_QUEUE_EXECUTOR`: cheap execution model as `provider/model` for objective batches
+- `BATCH_QUEUE_EXECUTOR`: execution model as `provider/model` for objective batches
 - `BATCH_QUEUE_EXECUTOR_PROVIDER`: execution model provider when set separately
 - `BATCH_QUEUE_EXECUTOR_MODEL`: execution model id when set separately
+- `BATCH_QUEUE_EXECUTOR_BASE_URL`: OpenAI-compatible chat completions base URL, such as `http://127.0.0.1:8080/v1`
+- `BATCH_QUEUE_EXECUTOR_API_KEY`: API key for that endpoint
 - `BATCH_QUEUE_EXECUTOR_THINKING`: optional reasoning/thinking effort (`minimal`, `low`, `medium`, `high`, `xhigh`)
 - `BATCH_QUEUE_GROUNDING_TURNS`: read/grep grounding turns before the planner must submit, default `3` (`0` = plan blind)
 - `BATCH_QUEUE_REQUIRE_PLAN_REFLECTION`: set to `false` to stop asking objective planners for confidence/risk reflection metadata
@@ -207,7 +206,9 @@ The planner / driver model is always your main session model. An optional cheap 
 Example:
 
 ```bash
-export BATCH_QUEUE_EXECUTOR=openai/gpt-5.4-nano
+export BATCH_QUEUE_EXECUTOR=bifrost/vertex/google/gemini-3.7-flash
+export BATCH_QUEUE_EXECUTOR_BASE_URL=http://127.0.0.1:8080/v1
+export BATCH_QUEUE_EXECUTOR_API_KEY="$BIFROST_API_KEY"
 pi --provider openai --model gpt-5.4-mini
 ```
 

@@ -26,23 +26,6 @@ export interface BatchQueueConfig {
 	 */
 	maxBatchActions?: number;
 	/**
-	 * Optional cheap model for converting an `objective` into action batches.
-	 * When unset, the session driver / planner model is used.
-	 * JSON alias: `executionModel`.
-	 */
-	executorModel?: ModelRef;
-	/**
-	 * Optional cheap model for converting an `objective` into action batches.
-	 * When unset, the session driver / planner model is used.
-	 */
-	executionModel?: ModelRef;
-	/**
-	 * Optional reasoning/thinking effort for objective→actions conversion.
-	 * Applied best-effort: Pi forwards it as provider reasoningEffort; OpenCode
-	 * forwards it as the prompt variant.
-	 */
-	executorThinking?: ExecutorThinkingLevel;
-	/**
 	 * How many read/grep grounding turns the planner may take before it must
 	 * submit a batch. 0 = plan blind in one shot (old behavior). Default: 3.
 	 */
@@ -70,6 +53,8 @@ export interface ResolvedBatchQueueConfig {
 	 * When unset, the session driver / planner model is used.
 	 */
 	readonly executorModel?: ModelRef;
+	readonly executorBaseUrl?: string;
+	readonly executorApiKey?: string;
 	readonly executorThinking?: ExecutorThinkingLevel;
 	readonly groundingTurns: number;
 	readonly requirePlanReflection: boolean;
@@ -81,6 +66,8 @@ const ENV_MAX_ACTIONS = "BATCH_QUEUE_MAX_ACTIONS";
 const ENV_EXECUTOR = "BATCH_QUEUE_EXECUTOR";
 const ENV_EXECUTOR_PROVIDER = "BATCH_QUEUE_EXECUTOR_PROVIDER";
 const ENV_EXECUTOR_MODEL = "BATCH_QUEUE_EXECUTOR_MODEL";
+const ENV_EXECUTOR_BASE_URL = "BATCH_QUEUE_EXECUTOR_BASE_URL";
+const ENV_EXECUTOR_API_KEY = "BATCH_QUEUE_EXECUTOR_API_KEY";
 const ENV_EXECUTOR_THINKING = "BATCH_QUEUE_EXECUTOR_THINKING";
 const ENV_GROUNDING_TURNS = "BATCH_QUEUE_GROUNDING_TURNS";
 const ENV_REQUIRE_PLAN_REFLECTION = "BATCH_QUEUE_REQUIRE_PLAN_REFLECTION";
@@ -149,17 +136,10 @@ export function resolveBatchQueueConfig(
 		fileConfig.maxBatchActions ??
 		DEFAULT_MAX_BATCH_ACTIONS;
 
-	const executorModel =
-		overrides.executionModel ??
-		overrides.executorModel ??
-		parseExecutorFromEnv() ??
-		fileConfig.executionModel ??
-		fileConfig.executorModel;
-
-	const executorThinking =
-		overrides.executorThinking ??
-		parseExecutorThinking(process.env[ENV_EXECUTOR_THINKING]) ??
-		fileConfig.executorThinking;
+	const executorModel = parseExecutorFromEnv();
+	const executorBaseUrl = process.env[ENV_EXECUTOR_BASE_URL]?.trim();
+	const executorApiKey = process.env[ENV_EXECUTOR_API_KEY]?.trim();
+	const executorThinking = parseExecutorThinking(process.env[ENV_EXECUTOR_THINKING]);
 
 	const groundingTurns =
 		overrides.groundingTurns ??
@@ -171,6 +151,8 @@ export function resolveBatchQueueConfig(
 		maxBatchActions,
 		groundingTurns: Math.max(0, groundingTurns),
 		...(executorModel ? { executorModel } : {}),
+		...(executorBaseUrl ? { executorBaseUrl } : {}),
+		...(executorApiKey ? { executorApiKey } : {}),
 		...(executorThinking ? { executorThinking } : {}),
 		requirePlanReflection:
 			overrides.requirePlanReflection ??

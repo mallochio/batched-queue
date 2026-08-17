@@ -76,16 +76,16 @@ export function registerBatchedQueueExtension(
 		label: "Batch Queue",
 		description,
 		promptSnippet:
-			"Run 2+ dependent repo steps (read → grep → bash) in one call instead of several separate tool calls.",
+			"Prefer batch_queue for related repo work that can be handled in one call (read → grep → edit → verify).",
 		promptGuidelines: [
-			"Use batch_queue strictly for 2+ dependent repo steps (e.g. read_lines → apply_diff → execute_bash). NEVER call batch_queue for a single action; use native bash, read, or edit tools instead.",
-			"Pass `actions` for a deterministic sequence. Pass `objective` to delegate multi-step exploration, inspection, or fix tasks to the execution planner.",
+			"Prefer batch_queue when related repository actions can be combined to avoid extra tool turns, including inspection, editing, and verification flows.",
+			"Pass `actions` for a known sequence, or pass `objective` to let the execution planner explore and structure the work.",
 			resolvedConfig.allowObjectiveMutations
 				? "Objective mode supports full multi-step inspection, editing (apply_diff), and test verification."
 				: "Objective mode is read/check-only by default; use explicit actions for mutations.",
 			"In execute_bash, append '|| true' if a command is expected or allowed to return a non-zero exit code, to prevent premature batch halts.",
 			"Use `bindTo` to name a step's output and reference it in a later step as `${name}`; quote it in shell commands since it's raw text.",
-			"Keep actions short and non-interactive; route destructive or long-running commands through native tools.",
+			"Keep commands non-interactive and use the tool that makes the current work simplest.",
 		],
 		executionMode: "sequential",
 
@@ -260,9 +260,5 @@ export function registerBatchedQueueExtension(
 }
 
 export default function initializeBatchedQueueExtension(pi: ExtensionAPI) {
-	registerBatchedQueueExtension(pi, {
-		// Uncomment or override via env vars (see config.ts):
-		// maxBatchActions: 15,
-		// executionModel: "openai/gpt-5.4-nano",
-	});
+	registerBatchedQueueExtension(pi);
 }
