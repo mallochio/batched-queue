@@ -147,6 +147,11 @@ export function parseActionBatchPayload(
 	maxBatchActions: number = DEFAULT_MAX_BATCH_ACTIONS,
 ): ActionBatchPayload {
 	if (!isActionBatchPayload(value, maxBatchActions)) {
+		if (isRecord(value) && Array.isArray(value.actions) && value.actions.length > maxBatchActions) {
+			throw new Error(
+				`Invalid action batch payload: ${value.actions.length} actions exceeds maxBatchActions (${maxBatchActions})`,
+			);
+		}
 		throw new Error("Invalid action batch payload");
 	}
 

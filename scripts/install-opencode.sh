@@ -3,12 +3,13 @@
 #
 # Usage:
 #   ./scripts/install-opencode.sh           # update ~/.config/opencode/opencode.json
-#   ./scripts/install-opencode.sh --local   # update ./opencode.json in this repo
+#   ./scripts/install-opencode.sh --local   # update ./opencode.json in the current project
 #   ./scripts/install-opencode.sh --verify  # run OpenCode smoke tests only
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CALLER_DIR="$(pwd)"
 LOCAL=false
 VERIFY_ONLY=false
 V1=false
@@ -25,7 +26,7 @@ for arg in "$@"; do
 Register the batched-queue OpenCode plugin.
 
 Options:
-  --local   Write ./opencode.json and point it at this checkout
+  --local   Write ./opencode.json in the current directory, pointing at this checkout
   --v1      Target OpenCode 1.18.29+ (`plugin` key). Default is OpenCode 2 (`plugins`)
   --verify  Run OpenCode smoke/headless tests only (skip config edit)
   -h, --help  Show this help
@@ -75,7 +76,13 @@ if $VERIFY_ONLY; then
 fi
 
 if $LOCAL; then
-	CONFIG_PATH="$ROOT/opencode.json"
+	if [ "$CALLER_DIR" = "$ROOT" ]; then
+		echo "OpenCode already auto-loads .opencode/plugins/batched-queue.ts inside this checkout."
+		echo "Run --local from the project you want to register the plugin in, e.g.:"
+		echo "  cd /path/to/your-project && ${ROOT}/scripts/install-opencode.sh --local"
+		exit 0
+	fi
+	CONFIG_PATH="$CALLER_DIR/opencode.json"
 else
 	CONFIG_PATH="${HOME}/.config/opencode/opencode.json"
 	mkdir -p "$(dirname "$CONFIG_PATH")"
@@ -127,11 +134,13 @@ raw[key] = Array.isArray(raw[key]) ? raw[key] : [];
 const hasPlugin = raw[key].some((entry) =>
   typeof entry === 'string' && (entry === spec || entry.includes('batched-queue'))
 );
-if (!hasPlugin) {
+if (hasPlugin) {
+  console.log('A batched-queue entry already exists in ' + key + ' of ' + path + '; left unchanged.');
+} else {
   raw[key].push(spec);
+  fs.writeFileSync(path, JSON.stringify(raw, null, 2) + '\n');
+  console.log('Updated ' + key + ' in ' + path + ' with ' + spec);
 }
-fs.writeFileSync(path, JSON.stringify(raw, null, 2) + '\n');
-console.log('Updated ' + key + ' in ' + path + ' with ' + spec);
 " "$CONFIG_PATH" "$PLUGIN_SPEC" "$CONFIG_KEY"
 }
 

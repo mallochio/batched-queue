@@ -68,4 +68,27 @@ describe("loadFileConfig project paths", () => {
 			).toEqual({ allowObjectiveMutations: true });
 		});
 	});
+
+	it("ignores project config when skipProjectConfig is set", () => {
+		withTempDir((dir) => {
+			fs.mkdirSync(path.join(dir, path.dirname(OPENCODE_PROJECT_CONFIG_PATH)), { recursive: true });
+			fs.writeFileSync(
+				path.join(dir, OPENCODE_PROJECT_CONFIG_PATH),
+				JSON.stringify({ maxBatchActions: 3 }),
+			);
+			fs.writeFileSync(
+				path.join(dir, "package.json"),
+				JSON.stringify({ opencode: { batchQueue: { groundingTurns: 2 } } }),
+			);
+
+			expect(
+				loadFileConfig({
+					target: "opencode",
+					cwd: dir,
+					packageJsonPath: path.join(dir, "package.json"),
+					skipProjectConfig: true,
+				}),
+			).toEqual({ groundingTurns: 2 });
+		});
+	});
 });

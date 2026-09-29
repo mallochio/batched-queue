@@ -170,13 +170,15 @@ Do not use a bare GitHub URL (`https://github.com/mallochio/batched-queue`) as a
 ```bash
 chmod +x scripts/install-opencode.sh
 ./scripts/install-opencode.sh              # OpenCode 2, global git spec
-./scripts/install-opencode.sh --local      # OpenCode 2, ./opencode.json points at this checkout
+./scripts/install-opencode.sh --local      # OpenCode 2, current project's ./opencode.json points at this checkout
 ./scripts/install-opencode.sh --v1         # OpenCode 1.18.29+, global `plugin` key
 ./scripts/install-opencode.sh --v1 --local # OpenCode 1.18.29+, this checkout via git+file
 ./scripts/install-opencode.sh --verify     # smoke tests only
 ```
 
-`--local` on OpenCode 2 writes the absolute path of this repo. `--local --v1` writes `batched-queue@git+file://<this repo>`. Neither flag publishes a new npm version.
+Run `--local` from the project you want to register the plugin in, for example `cd ~/my-project && /path/to/batched-queue/scripts/install-opencode.sh --local`. On OpenCode 2 it writes the absolute path of this checkout; with `--v1` it writes `batched-queue@git+file://<this checkout>`. Run from inside the checkout itself, it makes no edit, because OpenCode already auto-loads `.opencode/plugins/batched-queue.ts` there. If any `batched-queue` entry already exists under the key, the script leaves the file unchanged. The script edits `opencode.json` only, not `opencode.jsonc`. Neither flag publishes a new npm version.
+
+OpenCode 2 registers the tool schema once at plugin load, from package defaults, with a ceiling of 32 actions. A session's `.opencode/batched-queue.json` can lower `maxBatchActions` (enforced on each call). To raise it above the package default, set `BATCH_QUEUE_MAX_ACTIONS` so the tool description the model sees matches.
 
 See [.opencode/INSTALL.md](.opencode/INSTALL.md) for config files, objective-mode limits, and troubleshooting.
 

@@ -97,6 +97,8 @@ export interface LoadFileConfigOptions {
 	readonly cwd?: string;
 	readonly packageJsonPath?: string;
 	readonly projectConfigPath?: string;
+	/** Read only package.json defaults; ignore any project config file. */
+	readonly skipProjectConfig?: boolean;
 }
 
 export function defaultPackageJsonPath(): string {
@@ -120,6 +122,9 @@ export function loadFileConfig(options: LoadFileConfigOptions = {}): BatchQueueC
 		settings.section,
 	);
 	let projectConfig: BatchQueueConfig = {};
+	if (options.skipProjectConfig) {
+		return packageConfig;
+	}
 	if (options.projectConfigPath) {
 		projectConfig = readConfigFile(options.projectConfigPath);
 	} else {

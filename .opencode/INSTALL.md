@@ -71,6 +71,8 @@ chmod +x scripts/install-opencode.sh
 ./scripts/install-opencode.sh --verify     # tests only, no config edit
 ```
 
+`--local` edits `opencode.json` in the directory you run it from, so `cd` into your project first. Inside this clone it makes no edit, because the plugin already auto-loads there. Existing `batched-queue` entries are left unchanged.
+
 ## Local development
 
 OpenCode 2, project `opencode.json`:

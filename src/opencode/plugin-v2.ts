@@ -29,7 +29,7 @@ export function createBatchedQueueV2Plugin(config: BatchQueueConfig = {}) {
 		async setup(ctx) {
 			const packageConfig: ResolvedBatchQueueConfig = resolveBatchQueueConfig(
 				config,
-				loadOpenCodeFileConfig({ projectConfigPath: "/batched-queue-no-project-config.json" }),
+				loadOpenCodeFileConfig({ skipProjectConfig: true }),
 			);
 			const runners = createRunnerMap();
 			const description = buildBatchQueueDescription(
@@ -106,12 +106,12 @@ export function createBatchedQueueV2Plugin(config: BatchQueueConfig = {}) {
 						}
 						const runner = runners.get(sessionID);
 						if (runner) {
-							await runner.dispose();
 							runners.delete(sessionID);
+							await runner.dispose().catch(() => undefined);
 						}
 					}
 				} catch {
-					// Subscription aborted on plugin unload.
+					// Subscription ended or aborted; remaining runners are disposed on unload.
 				}
 			})();
 

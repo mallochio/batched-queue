@@ -66,7 +66,7 @@ describe("ActionBatchPayload validation", () => {
 		}));
 
 		expect(() => parseActionBatchPayload({ actions })).toThrow(
-			/Invalid action batch payload/,
+			`exceeds maxBatchActions (${max})`,
 		);
 	});
 

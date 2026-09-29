@@ -8,6 +8,15 @@ import entry, {
 	BatchedQueuePlugin,
 	BatchedQueueV2Plugin,
 } from "../src/opencode/entry.ts";
+import * as pluginFile from "../.opencode/plugins/batched-queue.ts";
+
+const pluginFileExports = Object.keys(pluginFile);
+if (pluginFileExports.length !== 1 || pluginFileExports[0] !== "default") {
+	console.error(
+		`.opencode/plugins/batched-queue.ts must export only default (host loaders register every export), got: ${pluginFileExports.join(", ")}`,
+	);
+	process.exit(1);
+}
 
 if (BatchedQueueV2Plugin.id !== "batched-queue") {
 	console.error(`expected V2 plugin id "batched-queue", got ${BatchedQueueV2Plugin.id}`);
