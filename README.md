@@ -1,8 +1,84 @@
-# batched-queue (retired)
+# batched-queue
 
-This repo held `batch_queue`, a Prime Agent extension and OpenCode 2 plugin that ran several repo actions in one tool call. It has been removed: its measured benefit was small on short fixture tasks and flat to slightly negative on Terminal-Bench.
+`batch_queue` is a tool for [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) and [OpenCode 2](https://opencode.ai). It runs 1 to 10 dependent repo actions in one tool call, so the model does not pay a full tool turn per step.
 
-The last working version is commit `f46ae18`. To restore it, run `git checkout f46ae18 -- .`.
+Actions run in order: `read_lines`, `grep_pattern`, `execute_bash`, `apply_diff`. The shell keeps its cwd and env between steps and batches. The batch stops at the first failure. File paths stay inside the workspace. `apply_diff` checks syntax before it writes.
+
+## Layout
+
+```
+src/
+├── extension.ts          # Prime Agent extension (package.json → pi.extensions)
+├── opencode/plugin.ts    # OpenCode 2 plugin
+├── execute-batch-queue.ts# shared tool logic
+├── queue-runner.ts       # sequential fast-fail runner
+├── executors/            # one executor per action type
+├── diff-validation/      # diff matching and syntax checks
+└── lib/                  # path security, file mutation queue
+.opencode/plugins/batched-queue.ts  # OpenCode entry (package main/exports)
+tests/
+```
+
+Requirements: `bash` and `rg` on `PATH`.
+
+## Install in Prime Agent
+
+```bash
+prime-agent package install git:github.com/mallochio/batched-queue          # global
+prime-agent package install git:github.com/mallochio/batched-queue --local  # this project
+```
+
+Try it without installing:
+
+```bash
+prime-agent -e ./src/extension.ts
+```
+
+Remove it with `prime-agent package remove git:github.com/mallochio/batched-queue` (add `--local` for a project install).
+
+## Install in OpenCode 2
+
+```bash
+opencode plugin add "batched-queue@git+https://github.com/mallochio/batched-queue.git"
+```
+
+Or add the spec to `plugins` in `opencode.json` (project) or `~/.config/opencode/opencode.json` (global):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": ["batched-queue@git+https://github.com/mallochio/batched-queue.git"]
+}
+```
+
+Restart OpenCode after you change the config.
+
+## Tool usage
+
+```json
+{
+  "actions": [
+    { "type": "read_lines", "path": "src/config.ts", "startLine": 1, "endLine": 120 },
+    { "type": "grep_pattern", "pattern": "loadConfig", "glob": "*.ts" },
+    { "type": "apply_diff", "path": "src/config.ts", "oldText": "retries: 3", "newText": "retries: 5" },
+    { "type": "execute_bash", "command": "npm test -- config" }
+  ]
+}
+```
+
+Use `batch_queue` for short dependent sequences. Use native tools for one obvious step, for independent parallel reads, or for long-running and interactive commands. Append `|| true` to a command when a non-zero exit is expected.
+
+## Development
+
+```bash
+bun install
+bun run typecheck
+bun run test
+```
+
+## Credit
+
+The read/grep/bash action-queue pattern comes from [RGB-Agent](https://github.com/alexisfox7/RGB-Agent).
 
 ## License
 

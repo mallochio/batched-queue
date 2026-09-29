@@ -1,0 +1,6 @@
+node_modules/
+package-lock.json
+tests/.tmp/
+.cache
+.scratch/
+.DS_Store
