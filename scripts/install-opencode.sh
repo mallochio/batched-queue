@@ -11,24 +11,36 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOCAL=false
 VERIFY_ONLY=false
+V1=false
 REPO_URL="https://github.com/mallochio/batched-queue.git"
-PLUGIN_SPEC="batched-queue@git+${REPO_URL}"
+GITHUB_SPEC="batched-queue@git+${REPO_URL}"
 
 for arg in "$@"; do
 	case "$arg" in
 		--local) LOCAL=true ;;
+		--v1) V1=true ;;
 		--verify) VERIFY_ONLY=true ;;
 		-h | --help)
 			cat <<'EOF'
 Register the batched-queue OpenCode plugin.
 
 Options:
-  --local   Update ./opencode.json in the current project
+  --local   Write ./opencode.json and point it at this checkout
+  --v1      Target OpenCode 1.18.29+ (`plugin` key). Default is OpenCode 2 (`plugins`)
   --verify  Run OpenCode smoke/headless tests only (skip config edit)
   -h, --help  Show this help
 
-After registration, restart OpenCode. Verify with:
-  opencode run --print-logs "hello" 2>&1 | grep -i batch
+OpenCode 2 global (default):
+  plugins: ["batched-queue@git+https://github.com/mallochio/batched-queue.git"]
+
+OpenCode 2 project checkout (--local):
+  plugins: ["/absolute/path/to/this/repo"]
+
+OpenCode 1.18.29+ (--v1):
+  plugin: ["batched-queue@git+https://github.com/mallochio/batched-queue.git"]
+  --v1 --local uses batched-queue@git+file://<this repo>
+
+Restart OpenCode after registration.
 EOF
 			exit 0
 			;;
@@ -69,13 +81,38 @@ else
 	mkdir -p "$(dirname "$CONFIG_PATH")"
 fi
 
+if $V1; then
+	CONFIG_KEY="plugin"
+	if $LOCAL; then
+		PLUGIN_SPEC="batched-queue@git+file://${ROOT}"
+	else
+		PLUGIN_SPEC="$GITHUB_SPEC"
+	fi
+else
+	CONFIG_KEY="plugins"
+	if $LOCAL; then
+		PLUGIN_SPEC="$ROOT"
+	else
+		PLUGIN_SPEC="$GITHUB_SPEC"
+	fi
+fi
+
 if [ ! -f "$CONFIG_PATH" ]; then
-	cat >"$CONFIG_PATH" <<'EOF'
+	if $V1; then
+		cat >"$CONFIG_PATH" <<'EOF'
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": []
+}
+EOF
+	else
+		cat >"$CONFIG_PATH" <<'EOF'
 {
   "$schema": "https://opencode.ai/config.json",
   "plugins": []
 }
 EOF
+	fi
 fi
 
 upsert_plugin() {
@@ -84,20 +121,18 @@ upsert_plugin() {
 const fs = require('node:fs');
 const path = process.argv[1];
 const spec = process.argv[2];
-const root = process.argv[3];
+const key = process.argv[3];
 const raw = JSON.parse(fs.readFileSync(path, 'utf8'));
-const localSpec = 'batched-queue@git+file://' + root;
-const key = Array.isArray(raw.plugins) || !Array.isArray(raw.plugin) ? 'plugins' : 'plugin';
-raw[key] = raw[key] ?? [];
+raw[key] = Array.isArray(raw[key]) ? raw[key] : [];
 const hasPlugin = raw[key].some((entry) =>
-  typeof entry === 'string' && (entry.includes('batched-queue') || entry === localSpec)
+  typeof entry === 'string' && (entry === spec || entry.includes('batched-queue'))
 );
 if (!hasPlugin) {
   raw[key].push(spec);
 }
 fs.writeFileSync(path, JSON.stringify(raw, null, 2) + '\n');
-console.log('Updated ' + key + ' list in ' + path);
-" "$CONFIG_PATH" "$PLUGIN_SPEC" "$ROOT"
+console.log('Updated ' + key + ' in ' + path + ' with ' + spec);
+" "$CONFIG_PATH" "$PLUGIN_SPEC" "$CONFIG_KEY"
 }
 
 if command -v bun >/dev/null 2>&1; then
@@ -107,13 +142,7 @@ else
 fi
 
 echo ""
-echo "Installed. Restart OpenCode to load the plugin."
-echo ""
-echo "OpenCode 2 (preferred) — add to opencode.json:"
-echo "  \"plugins\": [\"${PLUGIN_SPEC}\"]"
-echo ""
-echo "OpenCode 1.x — add:"
-echo "  \"plugin\": [\"${PLUGIN_SPEC}\"]"
-echo ""
-echo "Local dev (this clone):"
-echo "  \"plugins\": [\"batched-queue@git+file://${ROOT}\"]"
+echo "Installed. Restart OpenCode so it reloads plugins."
+echo "Config key: ${CONFIG_KEY}"
+echo "Entry: ${PLUGIN_SPEC}"
+echo "File: ${CONFIG_PATH}"

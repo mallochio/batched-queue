@@ -103,7 +103,18 @@ prime-agent package install /path/to/batched-queue
 prime-agent package install /path/to/batched-queue --local
 ```
 
-The package declares resources under the inherited `pi` manifest key and the `pi-package` keyword. Host packages (`@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`) are peer dependencies so Prime Agent's bundled copies are used at runtime. Installed packages land under `~/.prime/agent/` (or `.prime/agent/` for `--local`).
+The package declares resources under the inherited `pi` manifest key and the `pi-package` keyword. Host packages (`@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`) are optional peer dependencies so Prime Agent can supply its bundled copies, and an OpenCode install does not fail when those packages are absent. Installed packages land under `~/.prime/agent/` (global) or `.prime/agent/` (`--local`).
+
+From a checkout, the helper does the same registration after the smoke test:
+
+```bash
+chmod +x scripts/install.sh
+./scripts/install.sh           # global
+./scripts/install.sh --local   # this project only
+./scripts/install.sh --verify  # deps + smoke test, no registration
+```
+
+`prime-agent` is used when it is on `PATH`. Otherwise the script falls back to legacy `pi install`.
 
 Legacy Pi CLI (still used by some benchmarks):
 
@@ -114,13 +125,17 @@ pi install -l https://github.com/mallochio/batched-queue
 
 ## Install — OpenCode plugin
 
-The package default-exports a **dual V1 + V2** entry (`server()` for OpenCode 1.x, `id` + `setup()` for OpenCode 2.x). Prefer OpenCode 2's `plugins` key; V1's `plugin` key still works on 1.x.
+The package default-exports one object with OpenCode 2 `id` + `setup()` and OpenCode 1 `server()`. The `server()` object form requires **OpenCode 1.18.29 or newer**. Older 1.x releases are not supported.
 
-OpenCode 2:
+Restart OpenCode after every install or config edit.
+
+### OpenCode 2
 
 ```bash
 opencode plugin add "batched-queue@git+https://github.com/mallochio/batched-queue.git"
 ```
+
+Or add the spec yourself:
 
 ```json
 {
@@ -131,7 +146,13 @@ opencode plugin add "batched-queue@git+https://github.com/mallochio/batched-queu
 }
 ```
 
-OpenCode 1.x (legacy key):
+Global config file: `~/.config/opencode/opencode.json`. Project config file: `opencode.json` in the project root.
+
+### OpenCode 1.18.29+
+
+```bash
+opencode plugin "batched-queue@git+https://github.com/mallochio/batched-queue.git" -g
+```
 
 ```json
 {
@@ -142,16 +163,24 @@ OpenCode 1.x (legacy key):
 }
 ```
 
-Restart OpenCode after install. Do not use a bare GitHub URL as a plugin entry. See [.opencode/INSTALL.md](.opencode/INSTALL.md) for local dev, config, and troubleshooting.
+Do not use a bare GitHub URL (`https://github.com/mallochio/batched-queue`) as a plugin entry. OpenCode 2 ignores the `plugin` key. OpenCode 1 ignores the `plugins` key.
 
-Or use the helper script:
+### Helper script
 
 ```bash
 chmod +x scripts/install-opencode.sh
-./scripts/install-opencode.sh
+./scripts/install-opencode.sh              # OpenCode 2, global git spec
+./scripts/install-opencode.sh --local      # OpenCode 2, ./opencode.json points at this checkout
+./scripts/install-opencode.sh --v1         # OpenCode 1.18.29+, global `plugin` key
+./scripts/install-opencode.sh --v1 --local # OpenCode 1.18.29+, this checkout via git+file
+./scripts/install-opencode.sh --verify     # smoke tests only
 ```
 
-OpenCode configuration uses `.opencode/batched-queue.json` and `package.json` → `opencode.batchQueue`. The session driver / planner model is inherited from your OpenCode session; only an optional cheap execution model needs configuration.
+`--local` on OpenCode 2 writes the absolute path of this repo. `--local --v1` writes `batched-queue@git+file://<this repo>`. Neither flag publishes a new npm version.
+
+See [.opencode/INSTALL.md](.opencode/INSTALL.md) for config files, objective-mode limits, and troubleshooting.
+
+OpenCode batch settings come from `.opencode/batched-queue.json` in the **session** directory and from `package.json` → `opencode.batchQueue`. The session model is the driver. `BATCH_QUEUE_EXECUTOR=provider/model` can select another OpenCode-configured model for objective planning. Custom base URL, API key, and thinking env vars are Prime Agent and OpenCode 1.x only; OpenCode 2 objective mode errors if a custom base URL or API key is set.
 
 ## Local development
 
@@ -209,7 +238,7 @@ Project-local config in `.prime/agent/batched-queue.json` (preferred). Legacy Pi
 }
 ```
 
-`groundingTurns` (default `3`) lets the objective planner read/grep the real repo before it plans; set `0` to plan blind in one shot (Prime Agent objective mode only). `requirePlanReflection` (default `true`) asks objective planners to attach structured confidence, success criteria, risks, and fallback metadata to submitted batches. Objective executor model, endpoint, key, and thinking are configured only through environment variables.
+`groundingTurns` (default `3`) lets the objective planner read/grep the real repo before it plans; set `0` to plan blind in one shot (Prime Agent objective mode only). `requirePlanReflection` (default `true`) asks objective planners to attach structured confidence, success criteria, risks, and fallback metadata to submitted batches.
 
 Copy `.prime/agent/batched-queue.json.example` to `.prime/agent/batched-queue.json` to get started.
 
@@ -238,9 +267,9 @@ Optional environment variables:
 - `BATCH_QUEUE_EXECUTOR`: execution model as `provider/model` for objective batches
 - `BATCH_QUEUE_EXECUTOR_PROVIDER`: execution model provider when set separately
 - `BATCH_QUEUE_EXECUTOR_MODEL`: execution model id when set separately
-- `BATCH_QUEUE_EXECUTOR_BASE_URL`: OpenAI-compatible chat completions base URL, such as `http://127.0.0.1:8080/v1`
-- `BATCH_QUEUE_EXECUTOR_API_KEY`: API key for that endpoint
-- `BATCH_QUEUE_EXECUTOR_THINKING`: optional reasoning/thinking effort (`minimal`, `low`, `medium`, `high`, `xhigh`)
+- `BATCH_QUEUE_EXECUTOR_BASE_URL`: OpenAI-compatible chat completions base URL. Prime Agent and OpenCode 1.x only. OpenCode 2 objective mode fails if this is set.
+- `BATCH_QUEUE_EXECUTOR_API_KEY`: API key for that endpoint. Prime Agent and OpenCode 1.x only. OpenCode 2 objective mode fails if this is set.
+- `BATCH_QUEUE_EXECUTOR_THINKING`: reasoning effort (`minimal`, `low`, `medium`, `high`, `xhigh`). Prime Agent and OpenCode 1.x only. OpenCode 2 does not forward this value.
 - `BATCH_QUEUE_GROUNDING_TURNS`: read/grep grounding turns before the planner must submit, default `3` (`0` = plan blind)
 - `BATCH_QUEUE_REQUIRE_PLAN_REFLECTION`: set to `false` to stop asking objective planners for confidence/risk reflection metadata
 - `BATCH_QUEUE_ALLOW_OBJECTIVE_MUTATIONS`: set to `true` to let objective-planned batches include `apply_diff`
@@ -433,8 +462,10 @@ OpenCode 2:
 
 ```bash
 opencode plugin list
-opencode plugin remove batched-queue
+opencode plugin remove "batched-queue@git+https://github.com/mallochio/batched-queue.git"
 ```
+
+If your OpenCode 2 build has no `plugin remove`, delete the spec from the `plugins` array and restart. OpenCode 1.18.29+ uses the `plugin` array instead.
 
 ## License
 

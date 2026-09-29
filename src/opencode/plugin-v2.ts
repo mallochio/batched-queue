@@ -12,8 +12,8 @@ import {
 } from "../execute-batch-queue.js";
 import { loadOpenCodeFileConfig } from "../file-config.js";
 import { buildBatchQueueDescription } from "../tool-description.js";
-import { analyzeOpenCodeV2BatchObjective } from "./analyzer-v2.js";
-import { createBatchQueueJsonSchema } from "./schemas-json.js";
+import { analyzeOpenCodeV2BatchObjective, openCodeSessionDirectory } from "./analyzer-v2.js";
+import { createBatchQueueJsonSchema, OPENCODE_V2_SCHEMA_MAX_ACTIONS } from "./schemas-json.js";
 
 function openCodeDriverDescription(): string {
 	return "OpenCode session model (selected in opencode.json or per session)";
@@ -27,17 +27,19 @@ export function createBatchedQueueV2Plugin(config: BatchQueueConfig = {}) {
 	return Plugin.define({
 		id: "batched-queue",
 		async setup(ctx) {
-			const directory = ctx.location.directory;
-			const resolvedConfig: ResolvedBatchQueueConfig = resolveBatchQueueConfig(
+			const packageConfig: ResolvedBatchQueueConfig = resolveBatchQueueConfig(
 				config,
-				loadOpenCodeFileConfig({ cwd: directory }),
+				loadOpenCodeFileConfig({ projectConfigPath: "/batched-queue-no-project-config.json" }),
 			);
 			const runners = createRunnerMap();
 			const description = buildBatchQueueDescription(
-				resolvedConfig,
+				packageConfig,
 				openCodeDriverDescription(),
 			);
-			const inputSchema = createBatchQueueJsonSchema(resolvedConfig);
+			const inputSchema = createBatchQueueJsonSchema({
+				...packageConfig,
+				maxBatchActions: Math.max(packageConfig.maxBatchActions, OPENCODE_V2_SCHEMA_MAX_ACTIONS),
+			});
 
 			await ctx.tool.transform((editor) => {
 				editor.add({
@@ -45,6 +47,19 @@ export function createBatchedQueueV2Plugin(config: BatchQueueConfig = {}) {
 					description,
 					input: inputSchema,
 					async execute(input, toolCtx) {
+						let cwd: string;
+						let resolvedConfig: ResolvedBatchQueueConfig;
+						try {
+							const session = await ctx.session.get({ sessionID: toolCtx.sessionID });
+							cwd = openCodeSessionDirectory(session);
+							resolvedConfig = resolveBatchQueueConfig(
+								config,
+								loadOpenCodeFileConfig({ cwd }),
+							);
+						} catch (error) {
+							const message = error instanceof Error ? error.message : String(error);
+							return { content: `ERROR: ${message}` };
+						}
 						const params = input as BatchQueueToolParams;
 						const executeResult = await executeBatchQueue({
 							config: resolvedConfig,
@@ -53,7 +68,7 @@ export function createBatchedQueueV2Plugin(config: BatchQueueConfig = {}) {
 							signal: toolCtx.signal,
 							deps: {
 								getSessionId: () => toolCtx.sessionID,
-								getCwd: () => directory,
+								getCwd: () => cwd,
 								resolveObjective: (objective) =>
 									analyzeOpenCodeV2BatchObjective(
 										{

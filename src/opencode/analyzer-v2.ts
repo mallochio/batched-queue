@@ -53,6 +53,16 @@ function extractJsonObject(text: string): unknown {
 	}
 }
 
+export function openCodeSessionDirectory(session: {
+	readonly location?: { readonly directory?: string } | null;
+}): string {
+	const directory = session.location?.directory?.trim();
+	if (!directory) {
+		throw new Error("batch_queue requires the OpenCode session directory");
+	}
+	return directory;
+}
+
 export async function resolveOpenCodeV2SessionModelRef(
 	sessionGet: OpenCodeV2SessionGet,
 	sessionID: string,
@@ -80,6 +90,12 @@ export async function analyzeOpenCodeV2BatchObjective(
 	objective: string,
 	config: ResolvedBatchQueueConfig,
 ): Promise<OpenCodeObjectiveResult> {
+	if (config.executorBaseUrl || config.executorApiKey) {
+		throw new Error(
+			"OpenCode v2 objective mode cannot use BATCH_QUEUE_EXECUTOR_BASE_URL or BATCH_QUEUE_EXECUTOR_API_KEY. Unset them, or pass explicit actions. Prime Agent and OpenCode 1.x still honor those variables.",
+		);
+	}
+
 	const driverModel = await resolveOpenCodeV2SessionModelRef(deps.sessionGet, parentSessionID);
 	const planningModel = resolvePlanningModelRef(driverModel, config);
 	const usageAccumulator = emptyPlannerUsage(planningModel.provider, planningModel.id);
@@ -89,7 +105,6 @@ export async function analyzeOpenCodeV2BatchObjective(
 		model: {
 			id: planningModel.id,
 			providerID: planningModel.provider,
-			...(config.executorThinking ? { variant: config.executorThinking } : {}),
 		},
 	});
 
