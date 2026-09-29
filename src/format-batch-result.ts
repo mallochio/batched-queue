@@ -7,7 +7,9 @@ export function buildBatchContinuationHints(result: BatchExecutionResult): strin
 	if (result.haltedPrematurely) {
 		const failed = result.haltedAtIndex ?? result.completedCount;
 		const notRun = result.totalRequested - result.completedCount;
-		const skipped = notRun > 0 ? ` Actions ${result.completedCount}-${result.totalRequested - 1} did not run.` : "";
+		const last = result.totalRequested - 1;
+		const range = notRun === 1 ? `Action ${last}` : `Actions ${result.completedCount}-${last}`;
+		const skipped = notRun > 0 ? ` ${range} did not run.` : "";
 		return [`Action ${failed} failed.${skipped} Fix the cause, then resend only the remaining steps.`];
 	}
 	const changed = result.results.some((r) => r.type === "apply_diff" && r.applied);
