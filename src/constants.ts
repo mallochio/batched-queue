@@ -1,8 +1,5 @@
-/** Default maximum actions per batch when no config override is provided. */
-export const DEFAULT_MAX_BATCH_ACTIONS = 10 as const;
-
-/** @deprecated Use DEFAULT_MAX_BATCH_ACTIONS or ResolvedBatchQueueConfig.maxBatchActions */
-export const MAX_BATCH_ACTIONS = DEFAULT_MAX_BATCH_ACTIONS;
+/** Maximum actions per batch. */
+export const MAX_BATCH_ACTIONS = 10 as const;
 
 /** Minimum number of actions required in a batch payload. */
 export const MIN_BATCH_ACTIONS = 1 as const;
@@ -17,7 +14,7 @@ export const ACTION_TYPES = [
 
 export type ActionType = (typeof ACTION_TYPES)[number];
 
-/** Default output limits applied by the queue runner (Milestone 2). */
+/** Output limits applied by the queue runner. */
 export const DEFAULT_OUTPUT_LIMITS = {
 	maxStdoutLines: 200,
 	maxStderrLines: 100,

@@ -20,13 +20,6 @@ export interface TruncationInfo extends TruncationBoundary {
 	readonly unit: TruncationUnit;
 }
 
-/** Head/tail segments for structured rendering of truncated output. */
-export interface TruncatedSegments<T> {
-	readonly head: readonly T[];
-	readonly tail: readonly T[];
-	readonly truncation: TruncationInfo;
-}
-
 export interface CapturedStream {
 	readonly text: string;
 	readonly truncation?: TruncationInfo;

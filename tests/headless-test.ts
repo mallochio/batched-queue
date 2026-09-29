@@ -1,6 +1,6 @@
 /**
- * Headless integration test: load extension via Pi loader and execute batch_queue
- * with a pre-planned action batch (no executor model / API call required).
+ * Headless integration test: load extension via the Prime Agent loader and execute batch_queue
+ * with an explicit action batch (no model call).
  *
  * run: bun run headless-test.ts
  */
@@ -10,7 +10,6 @@ import {
 	type ExtensionContext,
 	type RegisteredTool,
 } from "@earendil-works/pi-coding-agent";
-import type { Model } from "@earendil-works/pi-ai";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -48,7 +47,7 @@ if (registeredTool.definition.executionMode !== "sequential") {
 	process.exit(1);
 }
 
-if (!registeredTool.definition.promptSnippet?.includes("related repo work")) {
+if (!registeredTool.definition.promptSnippet?.includes("batch_queue")) {
 	console.error("batch_queue promptSnippet missing batch preference guidance");
 	process.exit(1);
 }
@@ -60,13 +59,8 @@ if (!registeredTool.definition.promptGuidelines?.some((line) => line.includes("b
 
 const mockContext = {
 	cwd: tmpDir,
-	model: { provider: "test", id: "mock-model" } as Model<"openai-completions">,
 	sessionManager: {
 		getSessionId: () => "headless-test-session",
-	},
-	modelRegistry: {
-		find: () => undefined,
-		getApiKeyAndHeaders: async () => ({ ok: false as const, error: "no model in test" }),
 	},
 	ui: {
 		select: async () => undefined,
@@ -96,8 +90,8 @@ const result = await registeredTool.definition.execute(
 	"test-call-1",
 	{
 		actions: [
-			{ type: "read_lines", path: "hello.txt", startLine: 1, endLine: 1, bindTo: "greeting" },
-			{ type: "execute_bash", command: "printf '%s' '${greeting}'" },
+			{ type: "read_lines", path: "hello.txt", startLine: 1, endLine: 1 },
+			{ type: "execute_bash", command: "cat hello.txt" },
 		],
 	},
 	undefined,
@@ -113,10 +107,10 @@ if (toolResult.isError) {
 }
 
 const text = toolResult.content[0]?.type === "text" ? toolResult.content[0].text : "";
-	if (!text.includes("✅ batch completed") || !text.includes("### Next steps")) {
-		console.error("Unexpected batch result:\n", text);
-		process.exit(1);
-	}
+if (!text.includes("✅ batch completed") || !text.includes("hello world")) {
+	console.error("Unexpected batch result:\n", text);
+	process.exit(1);
+}
 
 for (const ext of loadResult.extensions) {
 	const handlers = ext.handlers.get("session_shutdown") ?? [];
@@ -125,7 +119,7 @@ for (const ext of loadResult.extensions) {
 	}
 }
 
-console.log("OK: headless batch_queue execution via Pi extension loader");
+console.log("OK: headless batch_queue execution via the extension loader");
 console.log(text.split("\n").slice(0, 4).join("\n"));
 
 fs.rmSync(tmpDir, { recursive: true, force: true });

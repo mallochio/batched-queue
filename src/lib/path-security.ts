@@ -125,28 +125,3 @@ export const DEFAULT_PATH_SECURITY: PathSecurityConfig = {
 	allowedPaths: [],
 	blockSensitivePaths: true,
 };
-
-export function createPathValidator(
-	config: Partial<PathSecurityConfig> = {},
-	gitWorkspaceRoot?: string,
-) {
-	const merged = { ...DEFAULT_PATH_SECURITY, ...config };
-
-	const validate = (filePath: string, cwd: string) => {
-		const resolved = path.resolve(cwd, filePath);
-		const root = gitWorkspaceRoot ?? findWorkspaceRoot(cwd);
-		return validateResolvedPath(resolved, merged, root);
-	};
-
-	return {
-		validate,
-
-		validateOrThrow: (filePath: string, cwd: string) => {
-			const result = validate(filePath, cwd);
-			if (!result.allowed) {
-				throw new Error(result.reason);
-			}
-			return result;
-		},
-	};
-}

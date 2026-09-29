@@ -1,104 +1,67 @@
-import type { Plugin, PluginInput } from "@opencode-ai/plugin";
-import type { Event } from "@opencode-ai/sdk";
-import { tool } from "@opencode-ai/plugin";
+import { Plugin } from "@opencode/plugin";
 import {
-	type BatchQueueConfig,
-	resolveBatchQueueConfig,
-	type ResolvedBatchQueueConfig,
-} from "../config.js";
-import {
-	createRunnerMap,
+	BATCH_QUEUE_DESCRIPTION,
+	BatchQueueRunners,
+	type BatchQueueToolParams,
 	executeBatchQueue,
 } from "../execute-batch-queue.js";
-import { loadOpenCodeFileConfig } from "../file-config.js";
-import { buildBatchQueueDescription } from "../tool-description.js";
-import { analyzeOpenCodeBatchObjective } from "./analyzer.js";
-import { createBatchQueueZodArgs } from "./schemas-zod.js";
+import { BatchQueueParamsSchema } from "../schemas.js";
 
-type OpenCodeClient = PluginInput["client"];
-
-function openCodeDriverDescription(): string {
-	return "OpenCode session model (selected in opencode.json or per session)";
-}
-
-function sessionIdFromDeletedEvent(event: Event): string | undefined {
-	if (event.type !== "session.deleted") {
-		return undefined;
+function sessionDirectory(session: { readonly location?: { readonly directory?: string } | null }): string {
+	const directory = session.location?.directory?.trim();
+	if (!directory) {
+		throw new Error("batch_queue requires the OpenCode session directory");
 	}
-	return event.properties.info.id;
+	return directory;
 }
 
-export function createBatchedQueuePluginHooks(
-	resolvedConfig: ResolvedBatchQueueConfig,
-	client: OpenCodeClient,
-) {
-	const runners = createRunnerMap();
+/** OpenCode 2 plugin: registers `batch_queue` through `ctx.tool.transform`. */
+export const BatchedQueuePlugin = Plugin.define({
+	id: "batched-queue",
+	async setup(ctx) {
+		const runners = new BatchQueueRunners();
+		const input = structuredClone(BatchQueueParamsSchema) as unknown as Record<string, unknown>;
 
-	return {
-		event: async ({ event }: { readonly event: Event }) => {
-			const sessionID = sessionIdFromDeletedEvent(event);
-			if (!sessionID) {
-				return;
-			}
-			const runner = runners.get(sessionID);
-			if (runner) {
-				await runner.dispose();
-				runners.delete(sessionID);
-			}
-		},
-		tool: {
-			batch_queue: tool({
-				description: buildBatchQueueDescription(
-					resolvedConfig,
-					openCodeDriverDescription(),
-				),
-				args: createBatchQueueZodArgs(resolvedConfig),
-				async execute(args, context) {
-					const executeResult = await executeBatchQueue({
-						config: resolvedConfig,
-						params: args,
-						runners,
-						signal: context.abort,
-						deps: {
-							getSessionId: () => context.sessionID,
-							getCwd: () => context.directory,
-							resolveObjective: (objective, signal) =>
-								analyzeOpenCodeBatchObjective(
-									client,
-									context.sessionID,
-									objective,
-									resolvedConfig,
-									signal,
-								),
-						},
-					});
-
-					if (executeResult.isError) {
-						return `ERROR: ${executeResult.text}`;
+		await ctx.tool.transform((editor) => {
+			editor.add({
+				name: "batch_queue",
+				description: BATCH_QUEUE_DESCRIPTION,
+				input,
+				async execute(params, toolCtx) {
+					let cwd: string;
+					try {
+						cwd = sessionDirectory(await ctx.session.get({ sessionID: toolCtx.sessionID }));
+					} catch (error) {
+						return { content: `ERROR: ${error instanceof Error ? error.message : String(error)}` };
 					}
-					return executeResult.text;
+					const { text, isError } = await executeBatchQueue(
+						params as BatchQueueToolParams,
+						{ sessionId: toolCtx.sessionID, cwd },
+						runners,
+					);
+					return { content: isError ? `ERROR: ${text}` : text };
 				},
-			}),
-		},
-	};
-}
+			});
+		});
 
-export const BatchedQueuePlugin: Plugin = async ({ client, directory }) => {
-	const resolvedConfig = resolveBatchQueueConfig({}, loadOpenCodeFileConfig({ cwd: directory }));
-	return createBatchedQueuePluginHooks(resolvedConfig, client);
-};
+		const controller = new AbortController();
+		void (async () => {
+			try {
+				for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
+					if (event.type !== "session.deleted") continue;
+					const data = "data" in event ? (event.data as { sessionID?: string } | undefined) : undefined;
+					if (data?.sessionID) await runners.dispose(data.sessionID);
+				}
+			} catch {
+				// Subscription ends when the plugin unloads.
+			}
+		})();
 
-export function registerBatchedQueueOpenCodePlugin(
-	config: BatchQueueConfig = {},
-	directory?: string,
-) {
-	const resolvedConfig = resolveBatchQueueConfig(
-		config,
-		loadOpenCodeFileConfig({ cwd: directory }),
-	);
-	return {
-		resolvedConfig,
-		createHooks: (client: OpenCodeClient) =>
-			createBatchedQueuePluginHooks(resolvedConfig, client),
-	};
-}
+		return async () => {
+			controller.abort();
+			await runners.disposeAll();
+		};
+	},
+});
+
+export default BatchedQueuePlugin;

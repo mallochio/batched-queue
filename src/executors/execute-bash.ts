@@ -4,18 +4,12 @@ import { BASH_TIMEOUT_EXIT_CODE, type OutputLimits } from "../constants";
 import { captureStderr, captureStdout } from "../capture";
 import type { PersistentShell } from "../persistent-shell";
 import type { ShellSessionState } from "../state";
-import {
-	evaluatePermissionAsync,
-	loadPermissions,
-	type PermissionRule,
-} from "../lib/permissions";
 
 export interface ExecuteBashExecutionContext {
 	readonly shell: PersistentShell;
 	readonly shellState: ShellSessionState;
 	readonly limits: OutputLimits;
 	readonly defaultTimeoutMs: number;
-	readonly permissionRules?: PermissionRule[];
 }
 
 export async function executeBashCommand(
@@ -24,31 +18,6 @@ export async function executeBashCommand(
 	ctx: ExecuteBashExecutionContext,
 ): Promise<ExecuteBashActionResult> {
 	const started = Date.now();
-
-	const rules = ctx.permissionRules ?? loadPermissions();
-	const verdict = await evaluatePermissionAsync(
-		"Bash",
-		{ cmd: action.command },
-		rules,
-	);
-	if (verdict.action === "reject") {
-		const message = verdict.message
-			? `command rejected: ${verdict.message}`
-			: `command rejected by permission rule. command: ${action.command}`;
-
-		return {
-			index,
-			type: "execute_bash",
-			success: false,
-			exitCode: 1,
-			durationMs: Date.now() - started,
-			command: action.command,
-			stdout: { text: "" },
-			stderr: { text: message },
-			error: message,
-			haltReason: "permission_denied",
-		};
-	}
 
 	try {
 		const result = await ctx.shell.execute(

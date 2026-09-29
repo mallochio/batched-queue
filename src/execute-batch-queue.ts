@@ -1,143 +1,72 @@
 import type { QueueAction } from "./actions.js";
-import type { ResolvedBatchQueueConfig } from "./config.js";
-import { parseActionBatchPayloadWithConfig } from "./guards.js";
-import type { ActionBatchPayload, PlanReflection } from "./payload.js";
-import type { BatchExecutionResult } from "./results.js";
+import { MAX_BATCH_ACTIONS } from "./constants.js";
 import { formatBatchResult } from "./format-batch-result.js";
+import { parseActionBatchPayload } from "./guards.js";
 import { BatchQueueRunner } from "./queue-runner.js";
-import type { PlannerUsage } from "./planner-usage.js";
+import type { BatchExecutionResult } from "./results.js";
+
+export const BATCH_QUEUE_DESCRIPTION =
+	`Run 1 to ${MAX_BATCH_ACTIONS} typed repo actions in order in one tool call. ` +
+	"Action types: read_lines, grep_pattern, execute_bash, apply_diff. " +
+	"The shell cwd and env persist between steps and batches. The batch stops at the first failure. Paths stay inside the workspace.\n\n" +
+	"Example:\n" +
+	'```json\n{"actions": [{"type":"read_lines","path":"src/config.ts","startLine":1,"endLine":80},{"type":"execute_bash","command":"npm test -- config"}]}\n```';
+
+export const BATCH_QUEUE_GUIDELINES = [
+	"Use batch_queue when related repo steps (read, grep, edit, verify) can run in one call.",
+	"In execute_bash, append '|| true' when a non-zero exit code is expected, so the batch does not stop.",
+	"Keep commands non-interactive.",
+] as const;
 
 export interface BatchQueueToolParams {
-	readonly objective?: string;
-	readonly actions?: readonly QueueAction[];
+	readonly actions: readonly QueueAction[];
 	readonly batchId?: string;
-}
-
-export interface ObjectiveResolutionResult {
-	readonly payload: ActionBatchPayload;
-	readonly plannerUsage?: PlannerUsage;
-}
-
-export interface BatchQueueExecuteDeps {
-	readonly resolveObjective?: (
-		objective: string,
-		signal?: AbortSignal,
-	) => Promise<ObjectiveResolutionResult>;
-	readonly getSessionId: () => string;
-	readonly getCwd: () => string;
 }
 
 export interface BatchQueueExecuteResult {
 	readonly text: string;
 	readonly isError: boolean;
-	readonly rationale?: string;
-	readonly reflection?: PlanReflection;
 	readonly result?: BatchExecutionResult;
-	readonly plannerUsage?: PlannerUsage;
-	readonly error?: string;
 }
 
-export function createRunnerMap(): Map<string, BatchQueueRunner> {
-	return new Map();
-}
+/** Owns one persistent-shell runner per session. */
+export class BatchQueueRunners {
+	private readonly runners = new Map<string, BatchQueueRunner>();
 
-export async function disposeAllRunners(runners: Map<string, BatchQueueRunner>): Promise<void> {
-	for (const sessionId of runners.keys()) {
-		const runner = runners.get(sessionId);
-		if (runner) {
-			await runner.dispose();
-		}
-		runners.delete(sessionId);
-	}
-}
-
-export function getRunner(
-	runners: Map<string, BatchQueueRunner>,
-	sessionId: string,
-	cwd: string,
-	config: ResolvedBatchQueueConfig,
-): BatchQueueRunner {
-	let runner = runners.get(sessionId);
-	if (!runner) {
-		runner = new BatchQueueRunner(sessionId, cwd, {
-			pathSecurity: config.pathSecurity,
-		});
-		runners.set(sessionId, runner);
-	} else {
-		runner.syncWorkspaceRoot(cwd);
-	}
-	return runner;
-}
-
-export async function executeBatchQueue(options: {
-	readonly config: ResolvedBatchQueueConfig;
-	readonly params: BatchQueueToolParams;
-	readonly deps: BatchQueueExecuteDeps;
-	readonly runners: Map<string, BatchQueueRunner>;
-	readonly signal?: AbortSignal;
-}): Promise<BatchQueueExecuteResult> {
-	const { config, params, deps, runners, signal } = options;
-	let payload: ActionBatchPayload;
-	let plannerUsage: PlannerUsage | undefined;
-
-	try {
-		if (params.objective?.trim() && params.actions && params.actions.length > 0) {
-			return {
-				text: "batch_queue accepts exactly one of `objective` or `actions`, not both",
-				isError: true,
-				error: "objective and actions are mutually exclusive",
-			};
-		}
-		if (params.actions && params.actions.length > 0) {
-			payload = parseActionBatchPayloadWithConfig(
-				{ actions: params.actions, batchId: params.batchId },
-				config,
-			);
-		} else if (params.objective?.trim()) {
-			if (!deps.resolveObjective) {
-				return {
-					text: "batch_queue objective mode requires a session driver model or BATCH_QUEUE_EXECUTOR",
-					isError: true,
-					error: "missing objective resolver",
-				};
-			}
-			const resolved = await deps.resolveObjective(params.objective.trim(), signal);
-			payload = resolved.payload;
-			plannerUsage = resolved.plannerUsage;
-			if (params.batchId) {
-				payload = { ...payload, batchId: params.batchId };
-			}
+	get(sessionId: string, cwd: string): BatchQueueRunner {
+		let runner = this.runners.get(sessionId);
+		if (!runner) {
+			runner = new BatchQueueRunner(sessionId, cwd);
+			this.runners.set(sessionId, runner);
 		} else {
-			return {
-				text: "batch_queue requires either `objective` (executor plans batch) or `actions` (driver supplies batch)",
-				isError: true,
-				error: "missing objective or actions",
-			};
+			runner.syncWorkspaceRoot(cwd);
 		}
-	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		return {
-			text: `batch_queue planning failed: ${message}`,
-			isError: true,
-			error: message,
-		};
+		return runner;
 	}
 
-	const runner = getRunner(runners, deps.getSessionId(), deps.getCwd(), config);
-	const result = await runner.executeBatch(payload);
-	const usedObjective = Boolean(params.objective?.trim()) && !(params.actions && params.actions.length > 0);
-	const text = formatBatchResult(result, {
-		rationale: payload.rationale,
-		reflection: payload.reflection,
-		usedObjective,
-	});
+	async dispose(sessionId: string): Promise<void> {
+		await this.runners.get(sessionId)?.dispose();
+		this.runners.delete(sessionId);
+	}
 
-	return {
-		text,
-		isError: result.haltedPrematurely,
-		rationale: payload.rationale,
-		reflection: payload.reflection,
-		result,
-		plannerUsage,
-	};
+	async disposeAll(): Promise<void> {
+		for (const sessionId of [...this.runners.keys()]) {
+			await this.dispose(sessionId);
+		}
+	}
+}
+
+export async function executeBatchQueue(
+	params: BatchQueueToolParams,
+	session: { readonly sessionId: string; readonly cwd: string },
+	runners: BatchQueueRunners,
+): Promise<BatchQueueExecuteResult> {
+	let payload;
+	try {
+		payload = parseActionBatchPayload(params);
+	} catch (error) {
+		return { text: error instanceof Error ? error.message : String(error), isError: true };
+	}
+	const result = await runners.get(session.sessionId, session.cwd).executeBatch(payload);
+	return { text: formatBatchResult(result), isError: result.haltedPrematurely, result };
 }

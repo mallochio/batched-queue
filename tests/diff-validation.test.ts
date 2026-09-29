@@ -15,8 +15,8 @@ import {
 	validateSyntax,
 	routeSyntaxLanguage,
 } from "../src/diff-validation";
-import { resolveBatchQueueConfig, parseModelRefString } from "../src/config";
 import { parseActionBatchPayload } from "../src/guards";
+import { MAX_BATCH_ACTIONS } from "../src/constants";
 
 describe("semantic normalization", () => {
 	it("normalizes CRLF and trailing whitespace", () => {
@@ -92,24 +92,12 @@ describe("validateAndPrepareDiff", () => {
 	});
 });
 
-describe("configurable batch ceiling", () => {
-	it("respects maxBatchActions override", () => {
-		const config = resolveBatchQueueConfig({ maxBatchActions: 12 });
-		expect(config.maxBatchActions).toBe(12);
-
-		const actions = Array.from({ length: 12 }, () => ({
-			type: "execute_bash" as const,
-			command: "echo ok",
-		}));
-
-		const payload = parseActionBatchPayload({ actions }, config.maxBatchActions);
-		expect(payload.actions).toHaveLength(12);
-	});
-
-	it("parses executor model shorthand", () => {
-		expect(parseModelRefString("openrouter/deepseek/deepseek-v3.2-exp")).toEqual({
-			provider: "openrouter",
-			id: "deepseek/deepseek-v3.2-exp",
+describe("batch ceiling", () => {
+	it("accepts up to MAX_BATCH_ACTIONS and rejects more", () => {
+		const make = (length: number) => ({
+			actions: Array.from({ length }, () => ({ type: "execute_bash" as const, command: "echo ok" })),
 		});
+		expect(parseActionBatchPayload(make(MAX_BATCH_ACTIONS)).actions).toHaveLength(MAX_BATCH_ACTIONS);
+		expect(() => parseActionBatchPayload(make(MAX_BATCH_ACTIONS + 1))).toThrow();
 	});
 });

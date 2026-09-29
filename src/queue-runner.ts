@@ -4,7 +4,7 @@ import {
 	type OutputLimits,
 } from "./constants";
 export { BASH_TIMEOUT_EXIT_CODE } from "./constants.js";
-import type { ActionBatchPayload } from "./payload";
+import type { ActionBatchPayload } from "./actions";
 import type {
 	ActionExecutionResult,
 	BatchExecutionResult,
@@ -18,12 +18,6 @@ import {
 import { createPersistentShell, type PersistentShell } from "./persistent-shell";
 import { executeQueueAction } from "./executors";
 import { DEFAULT_FAILURE_HALT_REASON } from "./results";
-import {
-	BatchVariableResolutionError,
-	bindActionResult,
-	resolveActionBindings,
-	type BatchVariableBindings,
-} from "./bindings";
 import { DEFAULT_PATH_SECURITY, findWorkspaceRoot, type PathSecurityConfig } from "./lib/path-security";
 
 export interface BatchQueueRunnerOptions {
@@ -47,10 +41,6 @@ function shouldHaltBatch(result: ActionExecutionResult): boolean {
 
 function shouldResetShell(result: ActionExecutionResult): boolean {
 	return result.haltReason === "timeout";
-}
-
-function resolveBatchErrorHaltReason(error: unknown): BatchHaltReason {
-	return error instanceof BatchVariableResolutionError ? "validation_failed" : "shell_unavailable";
 }
 
 /**
@@ -88,7 +78,7 @@ export class BatchQueueRunner {
 		return this.session;
 	}
 
-	/** Keeps path security and shell cwd aligned with the current Pi session cwd. */
+	/** Keeps path security and shell cwd aligned with the current session cwd. */
 	syncWorkspaceRoot(workspaceRoot: string): void {
 		if (this.session.workspaceRoot === workspaceRoot) {
 			return;
@@ -146,12 +136,10 @@ export class BatchQueueRunner {
 
 		try {
 			const shell = await this.ensureShell();
-			const bindings: BatchVariableBindings = {};
 
 			for (let index = 0; index < payload.actions.length; index++) {
 				const action = payload.actions[index];
-				const resolvedAction = resolveActionBindings(action, bindings);
-				const result = await executeQueueAction(resolvedAction, index, {
+				const result = await executeQueueAction(action, index, {
 					workspaceRoot: this.session.workspaceRoot,
 					gitWorkspaceRoot: this.gitWorkspaceRoot,
 					pathSecurity: this.pathSecurity,
@@ -162,7 +150,6 @@ export class BatchQueueRunner {
 				});
 
 				results.push(result);
-				bindActionResult(resolvedAction, result, bindings);
 				this.session.metrics.totalActionsExecuted += 1;
 				this.session.updatedAtMs = Date.now();
 
@@ -180,7 +167,7 @@ export class BatchQueueRunner {
 			}
 		} catch (error) {
 			haltedPrematurely = true;
-			haltReason = resolveBatchErrorHaltReason(error);
+			haltReason = "shell_unavailable";
 			batchError = error instanceof Error ? error.message : String(error);
 			haltedAtIndex = results.length;
 			this.session.metrics.totalHalts += 1;
@@ -212,12 +199,4 @@ export class BatchQueueRunner {
 	async dispose(): Promise<void> {
 		await this.resetShell();
 	}
-}
-
-export function createBatchQueueRunner(
-	sessionId: string,
-	workspaceRoot: string,
-	options?: BatchQueueRunnerOptions,
-): BatchQueueRunner {
-	return new BatchQueueRunner(sessionId, workspaceRoot, options);
 }

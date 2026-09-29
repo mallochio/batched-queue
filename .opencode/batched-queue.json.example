@@ -1,6 +1,0 @@
-{
-  "groundingTurns": 3,
-  "requirePlanReflection": true,
-  "maxBatchActions": 10,
-  "allowObjectiveMutations": false
-}

@@ -1,5 +1,4 @@
 import type { ActionType } from "./constants.js";
-import type { QueueAction } from "./actions.js";
 import type { CapturedStream, TruncationInfo } from "./truncation.js";
 import type { ShellSessionStateSnapshot } from "./state.js";
 
@@ -86,17 +85,6 @@ export type ActionExecutionResult =
 	| ExecuteBashActionResult
 	| ApplyDiffActionResult;
 
-/** Maps action discriminators to their result shapes. */
-export interface ActionExecutionResultMap {
-	readonly read_lines: ReadLinesActionResult;
-	readonly grep_pattern: GrepPatternActionResult;
-	readonly execute_bash: ExecuteBashActionResult;
-	readonly apply_diff: ApplyDiffActionResult;
-}
-
-export type ActionExecutionResultOf<T extends ActionType> =
-	ActionExecutionResultMap[T];
-
 /**
  * Comprehensive structured output returned after a batch run completes
  * or halts prematurely.
@@ -117,10 +105,4 @@ export interface BatchExecutionResult {
 	readonly durationMs: number;
 	/** Populated when the batch aborts due to an unexpected runner failure. */
 	readonly error?: string;
-}
-
-/** Pairing of the requested action with its execution result. */
-export interface ActionResultPair<TAction extends QueueAction = QueueAction> {
-	readonly action: TAction;
-	readonly result: ActionExecutionResultOf<TAction["type"]>;
 }

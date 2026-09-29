@@ -1,1 +1,1 @@
-export { default, BatchedQueuePlugin, BatchedQueueV2Plugin } from "../../src/opencode/entry.ts";
+export { default, BatchedQueuePlugin } from "../../src/opencode/plugin.ts";

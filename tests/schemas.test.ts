@@ -1,43 +1,28 @@
-/**
- * schema and guard tests for the batched queue Milestone 1 types.
- *
- * run: bun test pi-config/extensions/batched-queue/schemas.test.ts
- */
+/** Schema and guard tests. */
 
 import { describe, it, expect } from "bun:test";
 import { Value } from "typebox/value";
-import { DEFAULT_MAX_BATCH_ACTIONS } from "../src/constants.js";
+import { MAX_BATCH_ACTIONS } from "../src/constants.js";
 import {
 	parseActionBatchPayload,
 	isQueueAction,
 	matchQueueAction,
 	validateReadLinesRange,
-	validateBatchActionCount,
 } from "../src/guards.js";
 import {
 	createInitialBatchQueueSessionState,
 	snapshotShellState,
 } from "../src/state.js";
-import {
-	createActionBatchPayloadSchema,
-	createBatchExecutionResultSchema,
-	createSubmitActionBatchToolSchema,
-	QueueActionSchema,
-} from "../src/schemas.js";
+import { BatchQueueParamsSchema, QueueActionSchema } from "../src/schemas.js";
 
 describe("ActionBatchPayload validation", () => {
 	it("accepts a valid multi-action batch", () => {
 		const payload = parseActionBatchPayload({
 			batchId: "batch-1",
-			reflection: {
-				confidence: 4,
-				successCriteria: "all actions complete",
-				risks: ["none"],
-			},
 			actions: [
-				{ type: "read_lines", path: "src/index.ts", startLine: 1, endLine: 50, bindTo: "indexSnippet" },
-				{ type: "grep_pattern", pattern: "export", glob: "*.ts", bindTo: "exports" },
-				{ type: "execute_bash", command: "npm test", bindTo: "testOutput" },
+				{ type: "read_lines", path: "src/index.ts", startLine: 1, endLine: 50 },
+				{ type: "grep_pattern", pattern: "export", glob: "*.ts" },
+				{ type: "execute_bash", command: "npm test" },
 				{
 					type: "apply_diff",
 					path: "src/index.ts",
@@ -49,38 +34,24 @@ describe("ActionBatchPayload validation", () => {
 
 		expect(payload.actions).toHaveLength(4);
 		expect(payload.batchId).toBe("batch-1");
-		expect(payload.reflection?.confidence).toBe(4);
 	});
 
 	it("rejects empty action arrays", () => {
 		expect(() =>
 			parseActionBatchPayload({ actions: [] }),
-		).toThrow(/Invalid action batch payload/);
+		).toThrow(/Invalid batch/);
 	});
 
-	it("rejects batches exceeding configured maxBatchActions", () => {
-		const max = DEFAULT_MAX_BATCH_ACTIONS;
+	it("rejects batches over MAX_BATCH_ACTIONS", () => {
+		const max = MAX_BATCH_ACTIONS;
 		const actions = Array.from({ length: max + 1 }, () => ({
 			type: "execute_bash" as const,
 			command: "echo hi",
 		}));
 
 		expect(() => parseActionBatchPayload({ actions })).toThrow(
-			/Invalid action batch payload/,
+			/Invalid batch/,
 		);
-	});
-
-	it("accepts batches up to a raised ceiling", () => {
-		const payload = parseActionBatchPayload(
-			{
-				actions: Array.from({ length: 10 }, () => ({
-					type: "execute_bash" as const,
-					command: "echo ok",
-				})),
-			},
-			10,
-		);
-		expect(payload.actions).toHaveLength(10);
 	});
 
 	it("rejects unknown action discriminators", () => {
@@ -99,47 +70,8 @@ describe("ActionBatchPayload validation", () => {
 		).toBe(false);
 	});
 
-	it("rejects an incomplete reflection", () => {
-		expect(() =>
-			parseActionBatchPayload({
-				actions: [{ type: "read_lines", path: "a.ts" }],
-				reflection: { successCriteria: "read the file", risks: [] },
-			}),
-		).toThrow(/Invalid action batch payload/);
-	});
-});
-
-describe("objective planner schema", () => {
-	it("rejects apply_diff when objective mutations are disabled", () => {
-		const schema = createSubmitActionBatchToolSchema(5);
-
-		expect(Value.Check(schema, {
-			actions: [
-				{
-					type: "apply_diff",
-					path: "src/index.ts",
-					oldText: "foo",
-					newText: "bar",
-				},
-			],
-		})).toBe(false);
-	});
-
-	it("allows apply_diff when objective mutations are enabled", () => {
-		const schema = createSubmitActionBatchToolSchema(5, {
-			allowMutatingActions: true,
-		});
-
-		expect(Value.Check(schema, {
-			actions: [
-				{
-					type: "apply_diff",
-					path: "src/index.ts",
-					oldText: "foo",
-					newText: "bar",
-				},
-			],
-		})).toBe(true);
+	it("rejects bindTo, which is no longer supported", () => {
+		expect(isQueueAction({ type: "read_lines", path: "a.ts", bindTo: "x" })).toBe(false);
 	});
 });
 
@@ -180,12 +112,6 @@ describe("field validators", () => {
 			}),
 		).toMatch(/endLine/);
 	});
-
-	it("flags batch count violations before schema parse", () => {
-		expect(
-			validateBatchActionCount({ actions: [] }, 10),
-		).toMatch(/at least/);
-	});
 });
 
 describe("state framework", () => {
@@ -209,53 +135,12 @@ describe("state framework", () => {
 	});
 });
 
-describe("result schema", () => {
-	it("validates a halted batch execution result", () => {
-		const result = {
-			batchId: "batch-2",
-			haltedPrematurely: true,
-			haltReason: "non_zero_exit" as const,
-			haltedAtIndex: 1,
-			completedCount: 1,
-			totalRequested: 3,
-			results: [
-				{
-					index: 0,
-					type: "execute_bash" as const,
-					success: true,
-					exitCode: 0,
-					durationMs: 12,
-					command: "echo ok",
-					stdout: { text: "ok\n" },
-					stderr: { text: "" },
-				},
-				{
-					index: 1,
-					type: "execute_bash" as const,
-					success: false,
-					exitCode: 1,
-					durationMs: 8,
-					error: "command failed",
-					haltReason: "non_zero_exit" as const,
-					command: "false",
-					stdout: { text: "" },
-					stderr: { text: "error\n" },
-				},
-			],
-			shellState: {
-				sessionId: "sess-1",
-				cwd: "/workspace",
-				alive: true,
-				lastExitCode: 1,
-			},
-			startedAtMs: 1000,
-			completedAtMs: 1020,
-			durationMs: 20,
-		};
-
-		expect(Value.Check(createBatchExecutionResultSchema(), result)).toBe(true);
-		expect(Value.Check(createActionBatchPayloadSchema(), { actions: [] })).toBe(
-			false,
-		);
+describe("tool parameter schema", () => {
+	it("matches the runtime guard", () => {
+		const valid = { actions: [{ type: "execute_bash", command: "ls" }] };
+		expect(Value.Check(BatchQueueParamsSchema, valid)).toBe(true);
+		expect(Value.Check(BatchQueueParamsSchema, { actions: [] })).toBe(false);
+		expect(Value.Check(BatchQueueParamsSchema, { ...valid, objective: "x" })).toBe(false);
+		expect(Value.Check(QueueActionSchema, valid.actions[0])).toBe(true);
 	});
 });
