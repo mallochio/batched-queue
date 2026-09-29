@@ -144,10 +144,10 @@ export class BatchQueueRunner {
 		let batchError: string | undefined;
 
 		try {
-			const shell = await this.ensureShell();
-
 			for (let index = 0; index < payload.actions.length; index++) {
 				const action = payload.actions[index];
+				// A command that calls `exit` ends the shell; start a fresh one for the next action.
+				const shell = await this.ensureShell();
 				const result = await executeQueueAction(action, index, {
 					workspaceRoot: this.session.workspaceRoot,
 					gitWorkspaceRoot: this.gitWorkspaceRoot,

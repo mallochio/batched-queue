@@ -21,7 +21,7 @@ export const DEFAULT_OUTPUT_LIMITS = {
 	maxStdoutChars: 64_000,
 	maxStderrChars: 16_000,
 	maxReadLines: 500,
-	maxGrepMatches: 100,
+	maxGrepMatches: 50,
 	maxLineChars: 500,
 } as const;
 

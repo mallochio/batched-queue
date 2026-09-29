@@ -7,6 +7,9 @@ import {
 	SHELL_STDOUT_END_MARKER,
 } from "./constants";
 
+/** Printed when a command calls `exit`: the shell is about to die. */
+const SHELL_EXITING_MARKER = `${SHELL_SENTINEL_PREFIX}:EXITING`;
+
 export interface ShellCommandResult {
 	readonly exitCode: number;
 	readonly stdout: string;
@@ -39,23 +42,27 @@ function buildInitScript(initialCwd: string): string {
 		"export PS1=''",
 		"unset PROMPT_COMMAND",
 		`cd ${q(initialCwd)} || exit 1`,
+		"exec 3>&1",
+		"__bq_finish() {",
+		"  local __bq_ec=$1",
+		"  cat \"$__bq_out\" >&3",
+		`  printf '%s\\n' ${q(SHELL_STDOUT_END_MARKER)} >&3`,
+		"  cat \"$__bq_err\" >&3",
+		`  printf '%s\\n' ${q(SHELL_STDERR_END_MARKER)} >&3`,
+		`  [[ -n "$2" ]] && printf '%s\\n' ${q(SHELL_EXITING_MARKER)} >&3`,
+		`  printf '%s\\n' "${SHELL_META_PREFIX}\${__bq_ec}:\$(pwd -P)" >&3`,
+		"  rm -f \"$__bq_out\" \"$__bq_err\"",
+		"}",
 		"__bq_exec() {",
-		"  local __bq_out __bq_err __bq_ec",
+		"  local __bq_ec",
 		"  __bq_out=\"$(mktemp)\"",
 		"  __bq_err=\"$(mktemp)\"",
-		"  if [[ \"$1\" == exit* ]]; then",
-		"    ( eval \"$1\" ) >\"$__bq_out\" 2>\"$__bq_err\"",
-		"    __bq_ec=$?",
-		"  else",
-		"    eval \"$1\" >\"$__bq_out\" 2>\"$__bq_err\"",
-		"    __bq_ec=$?",
-		"  fi",
-		"  cat \"$__bq_out\"",
-		`  printf '%s\\n' ${q(SHELL_STDOUT_END_MARKER)}`,
-		"  cat \"$__bq_err\"",
-		`  printf '%s\\n' ${q(SHELL_STDERR_END_MARKER)}`,
-		`  printf '%s\\n' "${SHELL_META_PREFIX}\${__bq_ec}:\$(pwd -P)"`,
-		"  rm -f \"$__bq_out\" \"$__bq_err\"",
+		"  # If the command calls `exit`, flush its output before the shell dies.",
+		"  trap '__bq_finish $? exiting' EXIT",
+		"  eval \"$1\" >\"$__bq_out\" 2>\"$__bq_err\"",
+		"  __bq_ec=$?",
+		"  trap - EXIT",
+		"  __bq_finish $__bq_ec",
 		"  return $__bq_ec",
 		"}",
 		`printf '%s\\n' ${q(`${SHELL_SENTINEL_PREFIX}:READY`)}`,
@@ -264,6 +271,9 @@ export class PersistentShell {
 		if (!parsed) return;
 
 		clearTimeout(this.pending.timer);
+		if (this.buffer.includes(SHELL_EXITING_MARKER)) {
+			this.closed = true;
+		}
 		this.buffer = "";
 		const pending = this.pending;
 		this.pending = null;
