@@ -3,17 +3,28 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { BatchQueueConfig } from "./config.js";
 
-const PI_PROJECT_CONFIG_RELATIVE = path.join(".pi", "batched-queue.json");
+/** Legacy Pi coding-agent project config (still supported). */
+const PI_LEGACY_PROJECT_CONFIG_RELATIVE = path.join(".pi", "batched-queue.json");
+/** Prime Agent project config (preferred for Prime Agent sessions). */
+const PRIME_AGENT_PROJECT_CONFIG_RELATIVE = path.join(".prime", "agent", "batched-queue.json");
 const OPENCODE_PROJECT_CONFIG_RELATIVE = path.join(".opencode", "batched-queue.json");
 
-export const PI_PROJECT_CONFIG_PATH = PI_PROJECT_CONFIG_RELATIVE;
+/** @deprecated Use {@link PRIME_AGENT_PROJECT_CONFIG_PATH} for new Prime Agent projects. */
+export const PI_PROJECT_CONFIG_PATH = PI_LEGACY_PROJECT_CONFIG_RELATIVE;
+export const PRIME_AGENT_PROJECT_CONFIG_PATH = PRIME_AGENT_PROJECT_CONFIG_RELATIVE;
 export const OPENCODE_PROJECT_CONFIG_PATH = OPENCODE_PROJECT_CONFIG_RELATIVE;
 
 export type ConfigTarget = "pi" | "opencode";
 
-const TARGET_SETTINGS: Record<ConfigTarget, { readonly section: "pi" | "opencode"; readonly projectConfigRelative: string }> = {
-	pi: { section: "pi", projectConfigRelative: PI_PROJECT_CONFIG_RELATIVE },
-	opencode: { section: "opencode", projectConfigRelative: OPENCODE_PROJECT_CONFIG_RELATIVE },
+const TARGET_SETTINGS: Record<
+	ConfigTarget,
+	{ readonly section: "pi" | "opencode"; readonly projectConfigRelatives: readonly string[] }
+> = {
+	pi: {
+		section: "pi",
+		projectConfigRelatives: [PI_LEGACY_PROJECT_CONFIG_RELATIVE, PRIME_AGENT_PROJECT_CONFIG_RELATIVE],
+	},
+	opencode: { section: "opencode", projectConfigRelatives: [OPENCODE_PROJECT_CONFIG_RELATIVE] },
 };
 
 export interface BatchQueueJsonConfig {
@@ -98,7 +109,7 @@ export function defaultPackageJsonPath(): string {
  *
  * Precedence within file sources (later wins):
  * 1. package.json → {pi|opencode}.batchQueue (package defaults)
- * 2. project config in cwd (.pi/ or .opencode/batched-queue.json)
+ * 2. project config in cwd (`.prime/agent/batched-queue.json`, legacy `.pi/batched-queue.json`, or `.opencode/batched-queue.json`)
  */
 export function loadFileConfig(options: LoadFileConfigOptions = {}): BatchQueueConfig {
 	const target = options.target ?? "pi";
@@ -108,9 +119,14 @@ export function loadFileConfig(options: LoadFileConfigOptions = {}): BatchQueueC
 		options.packageJsonPath ?? defaultPackageJsonPath(),
 		settings.section,
 	);
-	const projectConfig = readConfigFile(
-		options.projectConfigPath ?? path.join(cwd, settings.projectConfigRelative),
-	);
+	let projectConfig: BatchQueueConfig = {};
+	if (options.projectConfigPath) {
+		projectConfig = readConfigFile(options.projectConfigPath);
+	} else {
+		for (const relative of settings.projectConfigRelatives) {
+			projectConfig = mergeFileConfigs(projectConfig, readConfigFile(path.join(cwd, relative)));
+		}
+	}
 
 	return mergeFileConfigs(packageConfig, projectConfig);
 }

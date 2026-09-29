@@ -1,5 +1,5 @@
 /**
- * Smoke test: load the batched-queue extension the same way Pi does at startup.
+ * Smoke test: load the batched-queue extension the same way Prime Agent does at startup.
  *
  * run: bun run smoke-test.ts
  */

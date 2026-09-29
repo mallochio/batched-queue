@@ -155,4 +155,10 @@ export {
 export { registerBatchedQueueExtension } from "./extension";
 export { default } from "./extension";
 export { BatchedQueuePlugin, registerBatchedQueueOpenCodePlugin } from "./opencode/plugin";
-export { loadOpenCodeFileConfig } from "./file-config";
+export {
+	loadFileConfig,
+	loadOpenCodeFileConfig,
+	OPENCODE_PROJECT_CONFIG_PATH,
+	PI_PROJECT_CONFIG_PATH,
+	PRIME_AGENT_PROJECT_CONFIG_PATH,
+} from "./file-config";

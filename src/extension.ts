@@ -1,14 +1,14 @@
 /**
- * Pi extension — stateful batched action queue with planner / execution model split.
+ * Prime Agent extension — stateful batched action queue with planner / execution model split.
  *
- * - Planner / driver model: the main model selected in Pi (ctx.model) — invokes and replans
+ * - Planner / driver model: the main session model (ctx.model) — invokes and replans
  * - Execution model: optional cheap model for objective→actions conversion when configured
  *
  * Configuration (in priority order, highest wins):
  * - extension factory overrides
  * - environment variables (BATCH_QUEUE_*)
- * - project `.pi/batched-queue.json`
- * - package.json `pi.batchQueue`
+ * - project `.prime/agent/batched-queue.json` (or legacy `.pi/batched-queue.json`)
+ * - package.json `pi.batchQueue` (inherited manifest key used by Prime Agent packages)
  */
 
 import type { Api, Model } from "@earendil-works/pi-ai";
@@ -68,7 +68,7 @@ export function registerBatchedQueueExtension(
 
 	const description = buildBatchQueueDescription(
 		resolvedConfig,
-		"Pi session model (ctx.model)",
+		"Prime Agent session model (ctx.model)",
 	);
 
 	pi.registerTool({
@@ -190,7 +190,7 @@ export function registerBatchedQueueExtension(
 
 			if (!driverModel) {
 				return {
-					content: [{ type: "text", text: "batch_queue requires an active driver model (main Pi model)" }],
+					content: [{ type: "text", text: "batch_queue requires an active driver model (main session model)" }],
 					details: { error: "missing driver model" } satisfies BatchQueueToolErrorDetails,
 					isError: true,
 				};

@@ -2,7 +2,7 @@
 
 ## Plan once. Execute a verified action pipeline. Replan from evidence.
 
-`batched-queue` is a low-latency tool for [Pi](https://github.com/earendil-works/pi) and [OpenCode](https://opencode.ai) coding-agent sessions. It executes up to N short, dependent repository actions in one tool call, preserving shell state and returning structured evidence for the next planning decision.
+`batched-queue` is a low-latency tool for [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) and [OpenCode](https://opencode.ai) coding-agent sessions. It executes up to N short, dependent repository actions in one tool call, preserving shell state and returning structured evidence for the next planning decision — so the driver model batches commands instead of paying a full tool turn per step.
 
 Instead of forcing the model to stop after every observation, a session can submit a small typed pipeline:
 
@@ -16,7 +16,7 @@ The queue executes `read_lines`, `grep_pattern`, `execute_bash`, and `apply_diff
 
 | Need | Best fit |
 | --- | --- |
-| One obvious read, search, or command | Native Pi/OpenCode tools |
+| One obvious read, search, or command | Native Prime Agent / OpenCode tools |
 | Independent reads or searches | Parallel tool calls |
 | 2–10 dependent repository actions | `batch_queue` |
 | Large DAGs, fan-out, worktrees, or durable jobs | A workflow/orchestration system |
@@ -30,8 +30,8 @@ batched-queue/
 ├── README.md
 ├── package.json
 ├── pyproject.toml        # uv-managed Harbor / Terminal-Bench tooling
-├── src/                  # extension and library source
-│   ├── extension.ts      # Pi extension entry point
+├── src/                  # shared core + two host adapters
+│   ├── extension.ts      # Prime Agent extension entry (pi package manifest)
 │   ├── opencode/         # OpenCode plugin adapter
 │   ├── index.ts          # public API barrel export
 │   ├── executors/        # action executors
@@ -43,10 +43,11 @@ batched-queue/
 │   ├── terminal-bench/   # Terminal-Bench 2.1 Harbor adapter
 │   └── results/          # local run artifacts (gitignored)
 ├── .opencode/            # OpenCode plugin entry + install docs
-├── .pi/                  # Pi config example
+├── .prime/agent/         # Prime Agent config example
+├── .pi/                  # legacy Pi config example (still read)
 ├── tests/                # unit, integration, and smoke tests
 └── scripts/
-    ├── install.sh        # Pi install helper
+    ├── install.sh        # Prime Agent package install helper
     └── install-opencode.sh
 ```
 
@@ -64,27 +65,52 @@ Research and publication docs live under [`benchmarks/`](./benchmarks/):
 
 ## Requirements
 
-- [Pi coding agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) on your `PATH`
+- [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) on your `PATH` (or legacy [Pi coding agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) for benchmarks)
 - [Bun](https://bun.sh) preferred, or Node/npm for dependency install
 - `bash` and `rg` on `PATH`
 
-## Install
+## Two integrations
 
-Install directly from GitHub:
+This repository ships **two adapters** over one shared executor:
+
+| Host | Entry | Registers | Token savings |
+| --- | --- | --- | --- |
+| **Prime Agent** | `src/extension.ts` via `package.json` → `pi.extensions` | `batch_queue` tool with session UI + prompt guidelines | One model turn runs many dependent repo actions |
+| **OpenCode** | `.opencode/plugins/batched-queue.ts` | Same `batch_queue` tool via OpenCode plugin hooks | Same batching semantics in OpenCode sessions |
+
+Use **Prime Agent** when you work in Prime Agent / pi-mono-compatible sessions. Use **OpenCode** when you work in OpenCode. You can install one or both; they share configuration shape but read host-specific project files.
+
+## Install — Prime Agent extension
+
+Install as a Prime Agent package (recommended):
 
 ```bash
-pi install https://github.com/mallochio/batched-queue
+prime-agent package install git:https://github.com/mallochio/batched-queue.git
 ```
 
 Project-local install:
 
 ```bash
+prime-agent package install git:https://github.com/mallochio/batched-queue.git --local
+```
+
+Or install from a checkout:
+
+```bash
+prime-agent package install /path/to/batched-queue
+prime-agent package install /path/to/batched-queue --local
+```
+
+The package manifest uses the inherited `pi` key in `package.json` (Prime Agent packages convention). Prime Agent stores installed packages under `~/.prime/agent/` (or `.prime/agent/` for `--local`); you do not need a separate manual `extensions` entry.
+
+Legacy Pi CLI (still used by some benchmarks):
+
+```bash
+pi install https://github.com/mallochio/batched-queue
 pi install -l https://github.com/mallochio/batched-queue
 ```
 
-Pi stores the package under `packages` in settings, so you do not need a separate `extensions` entry.
-
-## OpenCode install
+## Install — OpenCode plugin
 
 Use OpenCode's plugin installer:
 
@@ -134,10 +160,11 @@ The Python version is pinned to 3.12 for the Harbor benchmark dependency. Do
 not create a separate benchmark virtual environment; use `uv run` or the
 repository's `.venv/bin` entry points.
 
-You can also load it without installing:
+You can also load the Prime Agent extension without installing:
 
 ```bash
-pi -e ./src/extension.ts
+prime-agent -e ./src/extension.ts
+# legacy: pi -e ./src/extension.ts
 ```
 
 Or use the helper script:
@@ -149,16 +176,16 @@ chmod +x scripts/install.sh
 
 ## Configuration
 
-Settings are merged in this order (highest priority wins):
+Settings merge in this order (highest priority wins):
 
-1. Extension factory overrides (code)
+1. Extension / plugin factory overrides (code)
 2. Environment variables
-3. Project `.pi/batched-queue.json`
-4. `package.json` → `pi.batchQueue` (package defaults)
+3. Host project JSON (see below)
+4. `package.json` → `pi.batchQueue` or `opencode.batchQueue` (package defaults)
 
-### JSON config
+### Prime Agent JSON config
 
-Project-local config in `.pi/batched-queue.json`:
+Project-local config in `.prime/agent/batched-queue.json` (preferred). Legacy Pi paths (`.pi/batched-queue.json`) are still read; Prime Agent settings override legacy Pi settings when both exist.
 
 ```json
 {
@@ -169,7 +196,9 @@ Project-local config in `.pi/batched-queue.json`:
 }
 ```
 
-`groundingTurns` (default `3`) lets the objective planner read/grep the real repo before it plans; set `0` to plan blind in one shot (Pi objective mode only). `requirePlanReflection` (default `true`) asks objective planners to attach structured confidence, success criteria, risks, and fallback metadata to submitted batches. Objective executor model, endpoint, key, and thinking are configured only through environment variables.
+`groundingTurns` (default `3`) lets the objective planner read/grep the real repo before it plans; set `0` to plan blind in one shot (Prime Agent objective mode only). `requirePlanReflection` (default `true`) asks objective planners to attach structured confidence, success criteria, risks, and fallback metadata to submitted batches. Objective executor model, endpoint, key, and thinking are configured only through environment variables.
+
+Copy `.prime/agent/batched-queue.json.example` to `.prime/agent/batched-queue.json` to get started.
 
 Package defaults can live in `package.json`:
 
@@ -184,7 +213,9 @@ Package defaults can live in `package.json`:
 }
 ```
 
-Copy `.pi/batched-queue.json.example` to `.pi/batched-queue.json` to get started.
+### OpenCode JSON config
+
+Project-local config in `.opencode/batched-queue.json`. Copy `.opencode/batched-queue.json.example`. OpenCode also reads `package.json` → `opencode.batchQueue`.
 
 ### Environment variables
 
@@ -209,7 +240,7 @@ Example:
 export BATCH_QUEUE_EXECUTOR=bifrost/gemini-3.7-flash
 export BATCH_QUEUE_EXECUTOR_BASE_URL=http://127.0.0.1:8080/v1
 export BATCH_QUEUE_EXECUTOR_API_KEY="$BIFROST_API_KEY"
-pi --provider openai --model gpt-5.4-mini
+prime-agent --provider openai --model gpt-5.4-mini
 ```
 
 The driver (`gpt-5.4-mini`) replans; the optional execution model (`nano`) can handle objective→actions conversion when configured.
@@ -358,7 +389,7 @@ RGB-Agent’s core pattern is the one `batch_queue` generalizes for coding work:
 2. an action queue executes the plan with zero LLM calls per action;
 3. the analyzer runs again when the queue empties or important observations change.
 
-`batch_queue` adapts that Read/Grep/Bash planning-and-queue pattern to Pi and OpenCode repository workflows, adding workspace-safe file actions, persistent shell state, fast-fail execution, objective grounding, and optional typed result bindings.
+`batch_queue` adapts that Read/Grep/Bash planning-and-queue pattern to Prime Agent and OpenCode repository workflows, adding workspace-safe file actions, persistent shell state, fast-fail execution, objective grounding, and optional typed result bindings.
 
 Two additional design inspirations are:
 
@@ -369,10 +400,27 @@ These projects and papers are inspirations, not runtime dependencies or claims o
 
 ## Manage install
 
+Prime Agent:
+
+```bash
+prime-agent package list
+prime-agent package remove git:https://github.com/mallochio/batched-queue.git
+prime-agent package remove git:https://github.com/mallochio/batched-queue.git --local
+```
+
+Legacy Pi:
+
 ```bash
 pi list
 pi remove https://github.com/mallochio/batched-queue
 pi remove -l https://github.com/mallochio/batched-queue
+```
+
+OpenCode:
+
+```bash
+opencode plugin list
+opencode plugin remove batched-queue
 ```
 
 ## License

@@ -1,5 +1,7 @@
 # Installing batched-queue for OpenCode
 
+This is the **OpenCode plugin** half of `batched-queue`. For the **Prime Agent extension**, see the root [README](../README.md#install--prime-agent-extension).
+
 ## Prerequisites
 
 - [OpenCode](https://opencode.ai) installed

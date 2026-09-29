@@ -7,7 +7,7 @@ import {
 	type PathSecurityConfig,
 } from "./lib/path-security";
 
-/** Provider + model id pair used to resolve models via Pi's model registry. */
+/** Provider + model id pair used to resolve models via the agent model registry. */
 export interface ModelRef {
 	readonly provider: string;
 	readonly id: string;
@@ -17,7 +17,7 @@ export type ExecutorThinkingLevel = "minimal" | "low" | "medium" | "high" | "xhi
 
 /**
  * User-facing configuration for the batched queue extension.
- * Passed to the Pi extension factory, loaded from JSON files, and/or env vars.
+ * Passed to the Prime Agent extension factory, loaded from JSON files, and/or env vars.
  */
 export interface BatchQueueConfig {
 	/**
