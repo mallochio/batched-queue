@@ -1,6 +1,6 @@
 # batched-queue
 
-`batch_queue` is a tool for [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) and [OpenCode 2](https://opencode.ai). It runs 1 to 10 dependent repo actions in one tool call, so the model does not pay a full tool turn per step.
+`batch_queue` is an [OpenCode 2](https://opencode.ai) plugin tool. It runs 1 to 10 dependent repo actions in one tool call, so the model does not pay a full tool turn per step.
 
 Actions run in order: `read_lines`, `grep_pattern`, `execute_bash`, `apply_diff`. The shell keeps its cwd and env between steps and batches. The batch stops at the first failure. File paths stay inside the workspace. `apply_diff` checks syntax before it writes.
 
@@ -8,7 +8,6 @@ Actions run in order: `read_lines`, `grep_pattern`, `execute_bash`, `apply_diff`
 
 ```
 src/
-├── extension.ts          # Prime Agent extension (package.json → pi.extensions)
 ├── opencode/plugin.ts    # OpenCode 2 plugin
 ├── execute-batch-queue.ts# shared tool logic
 ├── queue-runner.ts       # sequential fast-fail runner
@@ -21,22 +20,11 @@ tests/
 
 Requirements: `bash` and `rg` on `PATH`.
 
-## Install in Prime Agent
+## Why not Prime Agent
 
-```bash
-prime-agent package install git:github.com/mallochio/batched-queue          # global
-prime-agent package install git:github.com/mallochio/batched-queue --local  # this project
-```
+Prime Agent's `ipython` tool already runs dependent steps in one call: one cell can edit, lint, and test, and stop at the first failure. A separate `batch_queue` tool adds nothing there, so this package only targets OpenCode 2.
 
-Try it without installing:
-
-```bash
-prime-agent -e ./src/extension.ts
-```
-
-Remove it with `prime-agent package remove git:github.com/mallochio/batched-queue` (add `--local` for a project install).
-
-## Install in OpenCode 2
+## Install
 
 ```bash
 opencode plugin add "batched-queue@git+https://github.com/mallochio/batched-queue.git"

@@ -51,7 +51,7 @@ export const QueueActionSchema = Type.Union([
 	ApplyDiffActionSchema,
 ]);
 
-/** Tool parameters shared by the Prime Agent and OpenCode entry points. */
+/** batch_queue tool parameters. */
 export const BatchQueueParamsSchema = Type.Object(
 	{
 		actions: Type.Array(QueueActionSchema, {
