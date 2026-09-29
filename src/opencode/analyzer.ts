@@ -116,7 +116,7 @@ function toPlainJsonSchema(config: ResolvedBatchQueueConfig): Record<string, unk
 		createSubmitActionBatchToolSchema(config.maxBatchActions, {
 			allowMutatingActions: config.allowObjectiveMutations,
 		}),
-	) as Record<string, unknown>;
+	) as unknown as Record<string, unknown>;
 }
 
 async function promptPlanningModel(

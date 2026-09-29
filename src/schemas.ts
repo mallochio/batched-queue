@@ -1,4 +1,4 @@
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static } from "typebox";
 import {
 	ACTION_TYPES,
 	DEFAULT_MAX_BATCH_ACTIONS,

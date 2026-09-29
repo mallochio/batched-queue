@@ -13,5 +13,5 @@ export function createBatchQueueJsonSchema(
 ): Record<string, unknown> {
 	return structuredClone(
 		createBatchQueueToolParameters(config.maxBatchActions),
-	) as Record<string, unknown>;
+	) as unknown as Record<string, unknown>;
 }

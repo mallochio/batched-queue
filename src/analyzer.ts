@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Api, Message, Model, Tool, ToolCall, Usage } from "@earendil-works/pi-ai";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import type { ActionBatchPayload } from "./payload.js";
 import type { ResolvedBatchQueueConfig } from "./config.js";
 import {

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { Value } from "@sinclair/typebox/value";
+import { Value } from "typebox/value";
 import { DEFAULT_MAX_BATCH_ACTIONS } from "../src/constants.js";
 import {
 	parseActionBatchPayload,
