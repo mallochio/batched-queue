@@ -3,6 +3,7 @@ package-lock.json
 .opencode/batched-queue.json
 tests/.tmp/
 .cache
+.scratch/
 .venv*
 .*venv*
 __pycache__/
