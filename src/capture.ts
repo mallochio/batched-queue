@@ -77,8 +77,15 @@ export function captureStreamText(
 ): CapturedStream {
 	const rawLines = text.length === 0 ? [] : text.split("\n");
 	const lineLimited = truncateLines(rawLines, maxLines);
-	let resultText = lineLimited.lines.join("\n");
 	let truncation = lineLimited.truncation;
+	const keptLines = truncation
+		? [
+			...lineLimited.lines.slice(0, truncation.headUnits),
+			`... [${truncation.omittedUnits} lines omitted] ...`,
+			...lineLimited.lines.slice(truncation.headUnits),
+		]
+		: lineLimited.lines;
+	let resultText = keptLines.join("\n");
 
 	if (resultText.length > maxChars) {
 		const half = Math.floor(maxChars / 2);

@@ -24,9 +24,8 @@ export default function batchedQueueExtension(api: ExtensionAPI) {
 		name: "batch_queue",
 		label: "Batch Queue",
 		description: BATCH_QUEUE_DESCRIPTION,
-		promptSnippet: "Run related repo steps (read, grep, edit, verify) in one batch_queue call.",
+		promptSnippet: "Run known dependent repo steps (edit → lint → test) in one batch_queue call.",
 		promptGuidelines: [...BATCH_QUEUE_GUIDELINES],
-		executionMode: "sequential",
 		parameters: BatchQueueParamsSchema,
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 			const { text, isError, result } = await executeBatchQueue(

@@ -13,7 +13,7 @@ describe("executeBatchQueue", () => {
 		);
 		await runners.disposeAll();
 		expect(result.isError).toBe(false);
-		expect(result.text).toContain("✅ batch completed");
+		expect(result.text).toContain("✓ batch completed");
 	});
 
 	it("rejects an empty batch", async () => {

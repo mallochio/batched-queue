@@ -34,7 +34,7 @@ const result = await tool.execute(
 await dispose();
 fs.rmSync(dir, { recursive: true, force: true });
 
-if (!result.content.includes("✅ batch completed") || !result.content.includes("hello world")) {
+if (!result.content.includes("✓ batch completed") || !result.content.includes("hello world")) {
 	console.error("Unexpected result:\n", result.content);
 	process.exit(1);
 }

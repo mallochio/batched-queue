@@ -42,8 +42,8 @@ if (!registeredTool) {
 	process.exit(1);
 }
 
-if (registeredTool.definition.executionMode !== "sequential") {
-	console.error("batch_queue should execute sequentially");
+if (registeredTool.definition.executionMode === "sequential") {
+	console.error("batch_queue must not force sequential mode; it would serialize every tool call in the turn");
 	process.exit(1);
 }
 
@@ -107,7 +107,7 @@ if (toolResult.isError) {
 }
 
 const text = toolResult.content[0]?.type === "text" ? toolResult.content[0].text : "";
-if (!text.includes("✅ batch completed") || !text.includes("hello world")) {
+if (!text.includes("✓ batch completed") || !text.includes("hello world")) {
 	console.error("Unexpected batch result:\n", text);
 	process.exit(1);
 }

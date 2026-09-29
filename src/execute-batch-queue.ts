@@ -6,16 +6,20 @@ import { BatchQueueRunner } from "./queue-runner.js";
 import type { BatchExecutionResult } from "./results.js";
 
 export const BATCH_QUEUE_DESCRIPTION =
-	`Run 1 to ${MAX_BATCH_ACTIONS} typed repo actions in order in one tool call. ` +
+	`Run 1 to ${MAX_BATCH_ACTIONS} dependent repo actions back-to-back in one tool call, then read all results together. ` +
+	"When you already know the next steps (for example edit → format → lint → test), send them as one batch instead of one tool call each. " +
 	"Action types: read_lines, grep_pattern, execute_bash, apply_diff. " +
-	"The shell cwd and env persist between steps and batches. The batch stops at the first failure. Paths stay inside the workspace.\n\n" +
+	"The shell keeps its cwd and env across steps and batches. The batch stops at the first failure; resend only the remaining steps. " +
+	"Paths stay inside the workspace. For independent reads, use parallel native tool calls instead.\n\n" +
 	"Example:\n" +
-	'```json\n{"actions": [{"type":"read_lines","path":"src/config.ts","startLine":1,"endLine":80},{"type":"execute_bash","command":"npm test -- config"}]}\n```';
+	'```json\n{"actions": [{"type":"apply_diff","path":"src/a.ts","oldText":"retries: 3","newText":"retries: 5"},{"type":"execute_bash","command":"npm run lint"},{"type":"execute_bash","command":"npm test -- a"}]}\n```';
 
 export const BATCH_QUEUE_GUIDELINES = [
-	"Use batch_queue when related repo steps (read, grep, edit, verify) can run in one call.",
+	"When you know two or more dependent next steps (edit, format, lint, test, inspect output), send them in one batch_queue call instead of separate tool calls.",
+	"Use parallel native tool calls for independent reads or searches; use batch_queue for sequences where later steps depend on earlier ones.",
+	"batch_queue stops at the first failing step. Fix the cause, then resend only the remaining steps.",
 	"In execute_bash, append '|| true' when a non-zero exit code is expected, so the batch does not stop.",
-	"Keep commands non-interactive.",
+	"Keep commands non-interactive and short-running.",
 ] as const;
 
 export interface BatchQueueToolParams {

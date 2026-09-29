@@ -55,6 +55,8 @@ export class BatchQueueRunner {
 	private readonly session: BatchQueueSessionState;
 	private shell: PersistentShell | null = null;
 	private shellStale = false;
+	/** Serializes batches that share this session's shell. */
+	private tail: Promise<unknown> = Promise.resolve();
 
 	constructor(
 		sessionId: string,
@@ -124,7 +126,14 @@ export class BatchQueueRunner {
 		this.session.updatedAtMs = Date.now();
 	}
 
-	async executeBatch(payload: ActionBatchPayload): Promise<BatchExecutionResult> {
+	/** Runs one batch. Concurrent calls for the same session wait their turn. */
+	executeBatch(payload: ActionBatchPayload): Promise<BatchExecutionResult> {
+		const run = this.tail.then(() => this.runBatch(payload));
+		this.tail = run.catch(() => undefined);
+		return run;
+	}
+
+	private async runBatch(payload: ActionBatchPayload): Promise<BatchExecutionResult> {
 		const startedAtMs = Date.now();
 		const totalRequested = payload.actions.length;
 		const results: ActionExecutionResult[] = [];

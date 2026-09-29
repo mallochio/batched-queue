@@ -25,7 +25,7 @@ describe("buildBatchContinuationHints", () => {
 				completedCount: 2,
 			}),
 		);
-		expect(hints.some((hint) => hint.includes("Fix the failing step"))).toBe(true);
+		expect(hints.some((hint) => hint.includes("resend only the remaining steps"))).toBe(true);
 	});
 
 	it("warns when workspace changed via apply_diff", () => {
@@ -46,7 +46,7 @@ describe("buildBatchContinuationHints", () => {
 				],
 			}),
 		);
-		expect(hints.some((hint) => hint.includes("Workspace changed"))).toBe(true);
+		expect(hints.some((hint) => hint.includes("Files changed"))).toBe(true);
 	});
 
 	it("adds no hints for a clean read-only batch", () => {
@@ -55,7 +55,7 @@ describe("buildBatchContinuationHints", () => {
 });
 
 describe("formatBatchResult", () => {
-	it("renders ACP-friendly markdown", () => {
+	it("renders compact fixed-layout text", () => {
 		const command = "printf 'ok'";
 		const text = formatBatchResult(baseResult({
 			results: [
@@ -72,12 +72,10 @@ describe("formatBatchResult", () => {
 			],
 		}));
 
-		expect(text).toContain("✅ batch completed");
-		expect(text).toContain("- cwd: `/tmp`");
-		expect(text).toContain("### Executed actions");
-		expect(text).toContain("#### ✅ [0] execute_bash");
-		expect(text).toContain("```bash\n" + command + "\n```");
-		expect(text).toContain("<summary>stdout</summary>");
-		expect(text).not.toContain("### Next steps");
+		expect(text).toContain("✓ batch completed: 1/1 actions");
+		expect(text).toContain("cwd /tmp");
+		expect(text).toContain("[0] ✓ bash `" + command + "`");
+		expect(text).toContain("```\nok\n```");
+		expect(text).not.toContain("next:");
 	});
 });
