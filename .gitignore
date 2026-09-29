@@ -2,7 +2,6 @@ node_modules/
 package-lock.json
 .opencode/batched-queue.json
 tests/.tmp/
-benchmarks/results/
 .cache
 .venv*
 .*venv*
@@ -10,5 +9,4 @@ __pycache__/
 *.pyc
 *.pkl
 .DS_Store
-benchmarks/terminal-bench/requirements.txt
 

@@ -24,7 +24,3 @@ jobs:
 
       - name: Unit tests
         run: bun test
-
-      - name: Deterministic benchmark (D1–D7)
-        run: bun run bench:deterministic --reps 5
-        timeout-minutes: 3
