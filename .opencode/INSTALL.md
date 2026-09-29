@@ -2,6 +2,11 @@
 
 This is the **OpenCode plugin** half of `batched-queue`. For the **Prime Agent extension**, see the root [README](../README.md#install--prime-agent-extension).
 
+The package default export supports **OpenCode V1 and V2** from one entrypoint:
+
+- V2: `Plugin.define` fields (`id`, `setup`) — tools via `ctx.tool.transform`
+- V1: `server()` — classic hook/`tool` map via `@opencode-ai/plugin`
+
 ## Prerequisites
 
 - [OpenCode](https://opencode.ai) installed
@@ -10,13 +15,28 @@ This is the **OpenCode plugin** half of `batched-queue`. For the **Prime Agent e
 
 ## One-line install
 
-Use OpenCode's plugin installer:
+### OpenCode 2 (preferred)
+
+```bash
+opencode plugin add "batched-queue@git+https://github.com/mallochio/batched-queue.git"
+```
+
+Or add to `~/.config/opencode/opencode.json` / project `opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    "batched-queue@git+https://github.com/mallochio/batched-queue.git"
+  ]
+}
+```
+
+### OpenCode 1.x
 
 ```bash
 opencode plugin "batched-queue@git+https://github.com/mallochio/batched-queue.git" -g
 ```
-
-Or add the same package spec to `~/.config/opencode/opencode.json` (global) or project `opencode.json`:
 
 ```json
 {
@@ -27,7 +47,7 @@ Or add the same package spec to `~/.config/opencode/opencode.json` (global) or p
 }
 ```
 
-Do not use the bare GitHub URL (`https://github.com/mallochio/batched-queue`) as a plugin entry. Restart OpenCode after install or config changes. The plugin installs automatically via Bun at startup.
+Do not use the bare GitHub URL (`https://github.com/mallochio/batched-queue`) as a plugin entry. Restart OpenCode after install or config changes.
 
 Pin a release tag for stability:
 
@@ -62,13 +82,13 @@ Use a `file://` URL pointing at your clone (must be a git repo):
 
 ```json
 {
-  "plugin": [
+  "plugins": [
     "batched-queue@git+file:///absolute/path/to/batched-queue"
   ]
 }
 ```
 
-Or symlink/copy [`.opencode/plugins/batched-queue.ts`](../plugins/batched-queue.ts) into a project's `.opencode/plugins/` directory.
+Or rely on auto-discovery: this repo's [`.opencode/plugins/batched-queue.ts`](plugins/batched-queue.ts) loads when you run OpenCode from the package root.
 
 ## Configuration
 
@@ -103,7 +123,7 @@ Then in `opencode.json`:
 
 ```json
 {
-  "plugin": ["~/.config/opencode/node_modules/batched-queue"]
+  "plugins": ["~/.config/opencode/node_modules/batched-queue"]
 }
 ```
 
@@ -112,15 +132,10 @@ Then in `opencode.json`:
 ### Plugin not loading
 
 1. Check logs: `opencode run --print-logs "hello" 2>&1 | grep -i batch`
-2. Confirm the `plugin` entry in `opencode.json` uses an npm package spec, not a bare GitHub URL
-3. Remove duplicate `batched-queue` entries from global and project configs
-4. Restart OpenCode after config changes
-
-If a git-package install still fails, use the local-plugin fallback: install this package under `~/.config/opencode` and add `~/.config/opencode/plugins/batched-queue.ts` containing:
-
-```ts
-export { BatchedQueuePlugin } from "batched-queue/src/opencode/plugin.ts";
-```
+2. Confirm the config uses an npm/git package spec, not a bare GitHub URL
+3. On OpenCode 2 use `plugins`; on 1.x use `plugin`
+4. Remove duplicate `batched-queue` entries from global and project configs
+5. Restart OpenCode after config changes
 
 ### Objective mode errors
 

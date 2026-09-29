@@ -76,22 +76,24 @@ This repository ships **two adapters** over one shared executor:
 | Host | Entry | Registers | Token savings |
 | --- | --- | --- | --- |
 | **Prime Agent** | `src/extension.ts` via `package.json` → `pi.extensions` | `batch_queue` tool with session UI + prompt guidelines | One model turn runs many dependent repo actions |
-| **OpenCode** | `.opencode/plugins/batched-queue.ts` | Same `batch_queue` tool via OpenCode plugin hooks | Same batching semantics in OpenCode sessions |
+| **OpenCode** | `.opencode/plugins/batched-queue.ts` (dual V1 `server()` + V2 `setup()`) | Same `batch_queue` tool | Same batching semantics in OpenCode sessions |
 
 Use **Prime Agent** when you work in Prime Agent / pi-mono-compatible sessions. Use **OpenCode** when you work in OpenCode. You can install one or both; they share configuration shape but read host-specific project files.
 
 ## Install — Prime Agent extension
 
-Install as a Prime Agent package (recommended):
+Install as a Prime Agent package (recommended). Source formats follow the [Prime Agent packages](https://github.com/PrimeIntellect-ai/prime-agent/blob/main/packages/coding-agent/docs/packages.md) docs:
 
 ```bash
-prime-agent package install git:https://github.com/mallochio/batched-queue.git
+prime-agent package install git:github.com/mallochio/batched-queue
+# or raw URL:
+prime-agent package install https://github.com/mallochio/batched-queue
 ```
 
 Project-local install:
 
 ```bash
-prime-agent package install git:https://github.com/mallochio/batched-queue.git --local
+prime-agent package install git:github.com/mallochio/batched-queue --local
 ```
 
 Or install from a checkout:
@@ -101,7 +103,7 @@ prime-agent package install /path/to/batched-queue
 prime-agent package install /path/to/batched-queue --local
 ```
 
-The package manifest uses the inherited `pi` key in `package.json` (Prime Agent packages convention). Prime Agent stores installed packages under `~/.prime/agent/` (or `.prime/agent/` for `--local`); you do not need a separate manual `extensions` entry.
+The package declares resources under the inherited `pi` manifest key and the `pi-package` keyword. Host packages (`@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`) are peer dependencies so Prime Agent's bundled copies are used at runtime. Installed packages land under `~/.prime/agent/` (or `.prime/agent/` for `--local`).
 
 Legacy Pi CLI (still used by some benchmarks):
 
@@ -112,13 +114,24 @@ pi install -l https://github.com/mallochio/batched-queue
 
 ## Install — OpenCode plugin
 
-Use OpenCode's plugin installer:
+The package default-exports a **dual V1 + V2** entry (`server()` for OpenCode 1.x, `id` + `setup()` for OpenCode 2.x). Prefer OpenCode 2's `plugins` key; V1's `plugin` key still works on 1.x.
+
+OpenCode 2:
 
 ```bash
-opencode plugin "batched-queue@git+https://github.com/mallochio/batched-queue.git" -g
+opencode plugin add "batched-queue@git+https://github.com/mallochio/batched-queue.git"
 ```
 
-Or add the same package spec to `~/.config/opencode/opencode.json` (or project `opencode.json`):
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    "batched-queue@git+https://github.com/mallochio/batched-queue.git"
+  ]
+}
+```
+
+OpenCode 1.x (legacy key):
 
 ```json
 {
@@ -129,7 +142,7 @@ Or add the same package spec to `~/.config/opencode/opencode.json` (or project `
 }
 ```
 
-Restart OpenCode. Do not use the bare GitHub URL (`https://github.com/mallochio/batched-queue`) as a plugin entry. See [.opencode/INSTALL.md](.opencode/INSTALL.md) for local dev, config, and troubleshooting.
+Restart OpenCode after install. Do not use a bare GitHub URL as a plugin entry. See [.opencode/INSTALL.md](.opencode/INSTALL.md) for local dev, config, and troubleshooting.
 
 Or use the helper script:
 
@@ -404,8 +417,8 @@ Prime Agent:
 
 ```bash
 prime-agent package list
-prime-agent package remove git:https://github.com/mallochio/batched-queue.git
-prime-agent package remove git:https://github.com/mallochio/batched-queue.git --local
+prime-agent package remove git:github.com/mallochio/batched-queue
+prime-agent package remove git:github.com/mallochio/batched-queue --local
 ```
 
 Legacy Pi:
@@ -416,7 +429,7 @@ pi remove https://github.com/mallochio/batched-queue
 pi remove -l https://github.com/mallochio/batched-queue
 ```
 
-OpenCode:
+OpenCode 2:
 
 ```bash
 opencode plugin list

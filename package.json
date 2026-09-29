@@ -5,6 +5,10 @@
   "license": "MIT",
   "type": "module",
   "main": ".opencode/plugins/batched-queue.ts",
+  "exports": {
+    ".": "./.opencode/plugins/batched-queue.ts",
+    "./package.json": "./package.json"
+  },
   "keywords": [
     "pi-package",
     "pi-extension",
@@ -40,7 +44,7 @@
   "scripts": {
     "setup": "bun install && ./scripts/install.sh",
     "setup:local": "bun install && ./scripts/install.sh --local",
-    "test": "bun test && bun run tests/smoke-test.ts && bun run tests/headless-test.ts && bun run tests/opencode-smoke-test.ts && bun run tests/opencode-headless-test.ts && bun run tests/opencode-objective-test.ts && bun run tests/opencode-schemas.test.ts && bun run tests/opencode-apply-diff-test.ts",
+    "test": "bun test && bun run tests/smoke-test.ts && bun run tests/headless-test.ts && bun run tests/opencode-smoke-test.ts && bun run tests/opencode-headless-test.ts && bun run tests/opencode-objective-test.ts && bun run tests/opencode-schemas.test.ts && bun run tests/opencode-apply-diff-test.ts && bun run tests/opencode-v2-smoke-test.ts",
     "bench:deterministic": "bun run benchmarks/deterministic/run.ts",
     "bench:terminal-bench": "bash benchmarks/terminal-bench/run.sh validate",
     "bench:model-mediated": "bash benchmarks/harness/handoff.sh",
@@ -48,8 +52,14 @@
   },
   "dependencies": {
     "@opencode-ai/plugin": "latest",
+    "@opencode/plugin": "latest",
     "@sinclair/typebox": "^0.34.0",
     "typescript": "^5.8.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "*",

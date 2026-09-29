@@ -155,6 +155,8 @@ export {
 export { registerBatchedQueueExtension } from "./extension";
 export { default } from "./extension";
 export { BatchedQueuePlugin, registerBatchedQueueOpenCodePlugin } from "./opencode/plugin";
+export { BatchedQueueV2Plugin, createBatchedQueueV2Plugin } from "./opencode/plugin-v2";
+export { default as OpenCodeBatchedQueueEntry } from "./opencode/entry";
 export {
 	loadFileConfig,
 	loadOpenCodeFileConfig,

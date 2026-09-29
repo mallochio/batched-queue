@@ -50,9 +50,11 @@ fi
 if command -v bun >/dev/null 2>&1; then
 	bun run tests/opencode-smoke-test.ts
 	bun run tests/opencode-headless-test.ts
+	bun run tests/opencode-v2-smoke-test.ts
 else
 	npx tsx tests/opencode-smoke-test.ts
 	npx tsx tests/opencode-headless-test.ts
+	npx tsx tests/opencode-v2-smoke-test.ts
 fi
 
 if $VERIFY_ONLY; then
@@ -71,55 +73,47 @@ if [ ! -f "$CONFIG_PATH" ]; then
 	cat >"$CONFIG_PATH" <<'EOF'
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": []
+  "plugins": []
 }
 EOF
 fi
 
+upsert_plugin() {
+	local runner="$1"
+	"$runner" -e "
+const fs = require('node:fs');
+const path = process.argv[1];
+const spec = process.argv[2];
+const root = process.argv[3];
+const raw = JSON.parse(fs.readFileSync(path, 'utf8'));
+const localSpec = 'batched-queue@git+file://' + root;
+const key = Array.isArray(raw.plugins) || !Array.isArray(raw.plugin) ? 'plugins' : 'plugin';
+raw[key] = raw[key] ?? [];
+const hasPlugin = raw[key].some((entry) =>
+  typeof entry === 'string' && (entry.includes('batched-queue') || entry === localSpec)
+);
+if (!hasPlugin) {
+  raw[key].push(spec);
+}
+fs.writeFileSync(path, JSON.stringify(raw, null, 2) + '\n');
+console.log('Updated ' + key + ' list in ' + path);
+" "$CONFIG_PATH" "$PLUGIN_SPEC" "$ROOT"
+}
+
 if command -v bun >/dev/null 2>&1; then
-	bun -e "
-const fs = require('node:fs');
-const path = process.argv[1];
-const spec = process.argv[2];
-const root = process.argv[3];
-const raw = JSON.parse(fs.readFileSync(path, 'utf8'));
-raw.plugin = raw.plugin ?? [];
-const localSpec = 'batched-queue@git+file://' + root;
-const hasPlugin = raw.plugin.some((entry) =>
-  typeof entry === 'string' && (entry.includes('batched-queue') || entry === localSpec)
-);
-if (!hasPlugin) {
-  raw.plugin.push(spec);
-}
-fs.writeFileSync(path, JSON.stringify(raw, null, 2) + '\n');
-console.log('Updated plugin list in ' + path);
-" "$CONFIG_PATH" "$PLUGIN_SPEC" "$ROOT"
+	upsert_plugin bun
 else
-	node -e "
-const fs = require('node:fs');
-const path = process.argv[1];
-const spec = process.argv[2];
-const root = process.argv[3];
-const raw = JSON.parse(fs.readFileSync(path, 'utf8'));
-raw.plugin = raw.plugin ?? [];
-const localSpec = 'batched-queue@git+file://' + root;
-const hasPlugin = raw.plugin.some((entry) =>
-  typeof entry === 'string' && (entry.includes('batched-queue') || entry === localSpec)
-);
-if (!hasPlugin) {
-  raw.plugin.push(spec);
-}
-fs.writeFileSync(path, JSON.stringify(raw, null, 2) + '\n');
-console.log('Updated plugin list in ' + path);
-" "$CONFIG_PATH" "$PLUGIN_SPEC" "$ROOT"
+	upsert_plugin node
 fi
 
 echo ""
 echo "Installed. Restart OpenCode to load the plugin."
 echo ""
-echo "One-line manual install (global):"
-echo "  Add to ~/.config/opencode/opencode.json:"
-echo "    \"plugin\": [\"${PLUGIN_SPEC}\"]"
+echo "OpenCode 2 (preferred) — add to opencode.json:"
+echo "  \"plugins\": [\"${PLUGIN_SPEC}\"]"
+echo ""
+echo "OpenCode 1.x — add:"
+echo "  \"plugin\": [\"${PLUGIN_SPEC}\"]"
 echo ""
 echo "Local dev (this clone):"
-echo "  \"plugin\": [\"batched-queue@git+file://${ROOT}\"]"
+echo "  \"plugins\": [\"batched-queue@git+file://${ROOT}\"]"
